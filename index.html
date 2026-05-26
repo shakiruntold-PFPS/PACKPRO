@@ -1,0 +1,659 @@
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACKPRO Chatbot</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <style>
+    body { font-family: 'DM Sans', sans-serif; }
+    .msg-enter { animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .chat-scroll { height: calc(100 * min(var(--vh,1vh),1vh) - 150px); }
+    .admin-panel { height: calc(100 * min(var(--vh,1vh),1vh)); }
+    .typing-dot { animation: blink 1.4s infinite both; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  </style>
+  <script src="/_sdk/resizing_sdk.js" type="text/javascript"></script>
+ </head>
+ <body data-template-id="__page-root" class="w-full min-h-screen flex flex-col"><!-- CHAT VIEW -->
+  <div id="chat-view" class="flex flex-col h-full">
+   <header data-template-id="chat-header" class="canva-header flex items-center gap-3 px-5 py-3 shadow-sm"><img data-template-id="brand-logo" class="canva-image w-10 h-10 rounded-lg object-cover" loading="lazy">
+    <div class="flex-1">
+     <h1 data-template-id="brand-title" class="canva-text font-bold"></h1>
+     <p data-template-id="brand-subtitle" class="canva-text text-xs"></p>
+    </div><button id="admin-toggle-btn" type="button" class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition"><i data-lucide="settings" style="width:14px;height:14px;"></i> Admin</button> <button id="human-btn" type="button" class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition"><i data-lucide="headphones" style="width:14px;height:14px;"></i> Sales Team</button>
+   </header>
+   <main id="chat-container" class="chat-scroll overflow-y-auto flex-1 px-4 py-4 space-y-3"></main>
+   <template id="bot-msg-tpl">
+    <div class="msg-enter flex gap-2 max-w-[85%]">
+     <div class="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0 mt-1"><span class="text-white text-xs font-bold">P</span>
+     </div>
+     <div data-template-id="bot-bubble" class="canva-card rounded-2xl rounded-tl-sm px-4 py-2.5">
+      <p data-template-id="bot-text" class="canva-text text-sm whitespace-pre-line"></p>
+     </div>
+    </div>
+   </template>
+   <template id="user-msg-tpl">
+    <div class="msg-enter flex justify-end max-w-[85%] ml-auto">
+     <div data-template-id="user-bubble" class="canva-card rounded-2xl rounded-tr-sm px-4 py-2.5">
+      <p data-template-id="user-text" class="canva-text text-sm"></p>
+     </div>
+    </div>
+   </template>
+   <template id="options-tpl">
+    <div class="msg-enter flex flex-wrap gap-2 pl-9"></div>
+   </template>
+   <template id="product-card-tpl">
+    <div class="msg-enter pl-9">
+     <div class="bg-white rounded-xl border border-gray-200 p-3 max-w-[280px] shadow-sm"><img class="product-card-img w-full h-28 object-cover rounded-lg mb-2" loading="lazy">
+      <h4 class="font-bold text-sm text-gray-900 product-card-name"></h4>
+      <p class="text-xs text-gray-500 product-card-category"></p>
+      <p class="text-xs text-gray-600 mt-1 product-card-desc"></p>
+      <div class="flex justify-between items-center mt-2"><span class="text-emerald-700 font-bold text-sm product-card-price"></span> <span class="text-xs text-gray-400 product-card-moq"></span>
+      </div><button type="button" class="mt-2 w-full py-1.5 text-xs font-medium rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition product-card-select">Select</button>
+     </div>
+    </div>
+   </template>
+   <footer class="px-4 py-3 border-t border-gray-200 bg-white">
+    <form id="msg-form" class="flex gap-2"><label for="msg-input" class="sr-only">Type a message</label> <input data-template-id="msg-input" id="msg-input" type="text" class="canva-input flex-1 px-4 py-2.5 rounded-full border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"> <button data-template-id="send-btn" type="submit" class="canva-button w-10 h-10 rounded-full flex items-center justify-center"><i data-lucide="send" style="width:18px;height:18px;"></i></button>
+    </form>
+   </footer>
+  </div><!-- ADMIN PANEL -->
+  <div id="admin-view" class="hidden flex flex-col admin-panel w-full bg-gray-50">
+   <header class="flex items-center gap-3 px-5 py-3 bg-white shadow-sm"><button id="admin-back-btn" type="button" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="arrow-left" style="width:20px;height:20px;"></i></button>
+    <h2 data-template-id="admin-title" class="canva-text font-bold flex-1"></h2><button id="add-product-btn" type="button" class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="plus" style="width:14px;height:14px;"></i> Add Product</button>
+   </header>
+   <div id="admin-content" class="flex-1 overflow-y-auto p-4 space-y-3"></div><!-- Product Form Modal -->
+   <div id="product-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto p-5">
+     <h3 id="modal-title" class="font-bold text-lg text-gray-900 mb-4">Add Product</h3>
+     <form id="product-form" class="space-y-3">
+      <div>
+       <label for="pf-name" class="text-xs font-medium text-gray-600">Product Name *</label><input id="pf-name" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+      </div>
+      <div>
+       <label for="pf-category" class="text-xs font-medium text-gray-600">Category</label><input id="pf-category" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g. Food Packaging">
+      </div>
+      <div>
+       <label for="pf-sizes" class="text-xs font-medium text-gray-600">Size Options (comma separated)</label><input id="pf-sizes" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Small, Medium, Large">
+      </div>
+      <div>
+       <label for="pf-material" class="text-xs font-medium text-gray-600">Material Type</label><input id="pf-material" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g. Corrugated, Kraft Paper">
+      </div>
+      <div>
+       <label for="pf-printing" class="text-xs font-medium text-gray-600">Printing Options (comma separated)</label><input id="pf-printing" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="No Print, Single Color, Multi Color">
+      </div>
+      <div class="flex gap-3">
+       <div class="flex-1">
+        <label for="pf-moq" class="text-xs font-medium text-gray-600">MOQ</label><input id="pf-moq" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="100">
+       </div>
+       <div class="flex-1">
+        <label for="pf-price" class="text-xs font-medium text-gray-600">Base Price (₹/unit)</label><input id="pf-price" type="number" step="0.5" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="8">
+       </div>
+      </div>
+      <div>
+       <label for="pf-image" class="text-xs font-medium text-gray-600">Image URL</label><input id="pf-image" type="url" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="https://...">
+      </div>
+      <div>
+       <label for="pf-desc" class="text-xs font-medium text-gray-600">Description</label><textarea id="pf-desc" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none" placeholder="Short product description"></textarea>
+      </div>
+      <div class="flex gap-2 pt-2"><button type="submit" class="flex-1 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">Save</button> <button type="button" id="modal-cancel" class="flex-1 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">Cancel</button>
+      </div>
+     </form>
+    </div>
+   </div><!-- Delete Confirmation -->
+   <div id="delete-confirm" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 text-center">
+     <p class="text-gray-900 font-medium mb-4">Delete this product?</p>
+     <div class="flex gap-2"><button type="button" id="delete-yes" class="flex-1 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">Delete</button> <button type="button" id="delete-no" class="flex-1 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">Cancel</button>
+     </div>
+    </div>
+   </div>
+  </div><!-- Payment Details Panel -->
+  <div id="payment-view" class="hidden flex flex-col admin-panel w-full bg-gray-50">
+   <header class="flex items-center gap-3 px-5 py-3 bg-white shadow-sm"><button id="payment-back-btn" type="button" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="arrow-left" style="width:20px;height:20px;"></i></button>
+    <h2 data-template-id="payment-title" class="canva-text font-bold flex-1"></h2>
+   </header>
+   <div class="flex-1 overflow-y-auto p-4">
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-4">
+     <div>
+      <label for="pay-upi" class="text-xs font-medium text-gray-600">UPI ID</label><input id="pay-upi" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="yourname@upi">
+     </div>
+     <div>
+      <label for="pay-account" class="text-xs font-medium text-gray-600">Account Number</label><input id="pay-account" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="XXXX-XXXX-1234">
+     </div>
+     <div>
+      <label for="pay-ifsc" class="text-xs font-medium text-gray-600">IFSC Code</label><input id="pay-ifsc" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="SBIN0001234">
+     </div>
+     <div>
+      <label for="pay-holder" class="text-xs font-medium text-gray-600">Account Holder Name</label><input id="pay-holder" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Business Name">
+     </div><button type="button" id="save-payment-btn" class="w-full py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">Save Payment Details</button>
+     <div id="payment-saved-msg" class="hidden text-center text-emerald-700 text-sm font-medium py-2">
+      ✓ Saved successfully
+     </div>
+     <div id="payment-display" class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 space-y-1"></div>
+    </div>
+   </div>
+  </div>
+  <script src="/_sdk/editing_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script>
+    lucide.createIcons();
+
+    const chat = document.getElementById('chat-container');
+    const form = document.getElementById('msg-form');
+    const input = document.getElementById('msg-input');
+    const humanBtn = document.getElementById('human-btn');
+    const adminToggle = document.getElementById('admin-toggle-btn');
+    const adminBack = document.getElementById('admin-back-btn');
+    const chatView = document.getElementById('chat-view');
+    const adminView = document.getElementById('admin-view');
+    const adminContent = document.getElementById('admin-content');
+    const addProductBtn = document.getElementById('add-product-btn');
+    const productModal = document.getElementById('product-modal');
+    const productForm = document.getElementById('product-form');
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalTitle = document.getElementById('modal-title');
+    const paymentView = document.getElementById('payment-view');
+    const paymentBackBtn = document.getElementById('payment-back-btn');
+    const deleteConfirm = document.getElementById('delete-confirm');
+    const deleteYes = document.getElementById('delete-yes');
+    const deleteNo = document.getElementById('delete-no');
+
+    let orders = [];
+    let step = 0;
+    let currentOrder = {};
+    let awaitingConfirmation = false;
+    let awaitingPayment = false;
+    let editingProductId = null;
+    let sessionEnded = false;
+    let deletingProductId = null;
+
+    // Default catalog
+    const defaultCatalog = [
+      { id:"1", name:"Corrugated Boxes", category:"Shipping", sizes:"6×4×3 inch,9×6×3 inch,12×9×4 inch,15×12×6 inch,Custom", material:"Corrugated Cardboard", printing:"No Print,Single Color,Multi Color,Custom Design", moq:100, price:8, image:"product-1", desc:"Heavy-duty corrugated boxes for shipping and storage." },
+      { id:"2", name:"Food Containers (Paper)", category:"Food Packaging", sizes:"250ml,500ml,750ml,1000ml", material:"Food-grade Paper", printing:"No Print,Single Color,Multi Color", moq:250, price:4, image:"product-2", desc:"Eco-friendly paper food containers for restaurants." },
+      { id:"3", name:"Burger Boxes", category:"Food Packaging", sizes:"Small (4 inch),Medium (5 inch),Large (6 inch)", material:"Kraft Paper", printing:"No Print,Single Color,Multi Color", moq:500, price:5, image:"product-3", desc:"Sturdy burger boxes with grease-resistant coating." },
+      { id:"4", name:"Pizza Boxes", category:"Food Packaging", sizes:"7 inch,9 inch,12 inch,14 inch", material:"Corrugated Kraft", printing:"No Print,Single Color,Multi Color,Custom Design", moq:200, price:7, image:"product-4", desc:"Standard and custom pizza boxes for delivery." },
+      { id:"5", name:"Cake Boxes", category:"Bakery", sizes:"Half Kg,1 Kg,2 Kg,3 Kg", material:"Art Card", printing:"No Print,Single Color,Multi Color,Custom Design", moq:100, price:12, image:"product-5", desc:"Premium cake boxes with window display option." },
+      { id:"6", name:"Mailer Bags (Courier)", category:"Shipping", sizes:"6×8 inch,8×10 inch,10×12 inch,12×16 inch", material:"POD Plastic / Paper", printing:"No Print,Single Color", moq:500, price:3, image:"product-6", desc:"Tamper-proof courier bags for e-commerce." },
+      { id:"7", name:"Paper Bags", category:"Retail", sizes:"Small,Medium,Large,XL", material:"Kraft Paper", printing:"No Print,Single Color,Multi Color,Custom Design", moq:250, price:5, image:"product-7", desc:"Branded paper bags for retail and gifting." },
+      { id:"8", name:"Sweet Boxes", category:"Bakery", sizes:"250gm,500gm,1 Kg,2 Kg", material:"Art Card / Duplex", printing:"No Print,Single Color,Multi Color,Custom Design", moq:100, price:10, image:"product-8", desc:"Decorative sweet boxes for festivals and events." },
+      { id:"9", name:"Donut Boxes", category:"Bakery", sizes:"4-Piece,6-Piece,12-Piece", material:"Art Card", printing:"No Print,Single Color,Multi Color,Custom Design", moq:150, price:8, image:"product-9", desc:"Sturdy boxes for donut and pastry packaging." },
+      { id:"10", name:"Biryani/Rice Boxes", category:"Food Packaging", sizes:"800ml,1000ml,1200ml", material:"Food-grade Kraft", printing:"No Print,Single Color,Multi Color", moq:300, price:6, image:"product-10", desc:"Premium containers for hot food delivery." },
+      { id:"11", name:"Coffee Cups with Lids", category:"Beverages", sizes:"8oz,12oz,16oz", material:"Paper", printing:"No Print,Single Color,Multi Color", moq:500, price:3, image:"product-11", desc:"Insulated cups perfect for cafes and restaurants." },
+      { id:"12", name:"Chicken Box (Fried Chicken)", category:"Food Packaging", sizes:"Single,2-Piece,3-Piece", material:"Kraft Paper", printing:"No Print,Single Color,Multi Color", moq:200, price:7, image:"product-12", desc:"Oil-resistant boxes for fried chicken and snacks." },
+    ];
+
+    function getCatalog() {
+      const stored = localStorage.getItem('packpro_catalog');
+      if (stored) return JSON.parse(stored);
+      localStorage.setItem('packpro_catalog', JSON.stringify(defaultCatalog));
+      return defaultCatalog;
+    }
+    function saveCatalog(catalog) {
+      localStorage.setItem('packpro_catalog', JSON.stringify(catalog));
+    }
+
+    function getProductNames() { return getCatalog().map(p => p.name); }
+    function getProduct(name) { return getCatalog().find(p => p.name === name); }
+
+    // Payment details (localStorage)
+    function getPaymentDetails() {
+      const stored = localStorage.getItem('packpro_payment');
+      return stored ? JSON.parse(stored) : { upi:'', account:'', ifsc:'', holder:'' };
+    }
+    function savePaymentDetails(data) {
+      localStorage.setItem('packpro_payment', JSON.stringify(data));
+    }
+
+    // Payment panel
+    paymentBackBtn.addEventListener('click', () => {
+      paymentView.classList.add('hidden');
+      adminView.classList.remove('hidden');
+    });
+
+    document.getElementById('save-payment-btn').addEventListener('click', () => {
+      const data = {
+        upi: document.getElementById('pay-upi').value.trim(),
+        account: document.getElementById('pay-account').value.trim(),
+        ifsc: document.getElementById('pay-ifsc').value.trim(),
+        holder: document.getElementById('pay-holder').value.trim()
+      };
+      savePaymentDetails(data);
+      renderPaymentDisplay();
+      const msg = document.getElementById('payment-saved-msg');
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 2000);
+    });
+
+    function renderPaymentDisplay() {
+      const d = getPaymentDetails();
+      const el = document.getElementById('payment-display');
+      if (!d.upi && !d.account) {
+        el.innerHTML = '<p class="text-gray-400 italic">No payment details saved yet.</p>';
+      } else {
+        el.innerHTML = `
+          ${d.upi ? '<p><strong>UPI:</strong> '+d.upi+'</p>' : ''}
+          ${d.account ? '<p><strong>Account:</strong> '+d.account+'</p>' : ''}
+          ${d.ifsc ? '<p><strong>IFSC:</strong> '+d.ifsc+'</p>' : ''}
+          ${d.holder ? '<p><strong>Holder:</strong> '+d.holder+'</p>' : ''}
+        `;
+      }
+    }
+
+    function loadPaymentForm() {
+      const d = getPaymentDetails();
+      document.getElementById('pay-upi').value = d.upi || '';
+      document.getElementById('pay-account').value = d.account || '';
+      document.getElementById('pay-ifsc').value = d.ifsc || '';
+      document.getElementById('pay-holder').value = d.holder || '';
+      renderPaymentDisplay();
+    }
+
+    // Admin panel
+    adminToggle.addEventListener('click', () => {
+      chatView.classList.add('hidden');
+      adminView.classList.remove('hidden');
+      paymentView.classList.add('hidden');
+      renderAdmin();
+    });
+    adminBack.addEventListener('click', () => {
+      adminView.classList.add('hidden');
+      chatView.classList.remove('hidden');
+    });
+
+    function renderAdmin() {
+      const catalog = getCatalog();
+      adminContent.innerHTML = '';
+
+      // Payment details button
+      const payBtn = document.createElement('button');
+      payBtn.type = 'button';
+      payBtn.className = 'w-full py-3 px-4 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition mb-2';
+      payBtn.innerHTML = '<i data-lucide="credit-card" style="width:18px;height:18px;" class="text-emerald-600"></i><span class="text-sm font-medium text-gray-900">Payment Details</span><i data-lucide="chevron-right" style="width:16px;height:16px;" class="ml-auto text-gray-400"></i>';
+      payBtn.addEventListener('click', () => {
+        adminView.classList.add('hidden');
+        paymentView.classList.remove('hidden');
+        loadPaymentForm();
+      });
+      adminContent.appendChild(payBtn);
+
+      if (!catalog.length) {
+        adminContent.innerHTML += '<p class="text-center text-gray-400 py-8">No products yet. Add one!</p>';
+        lucide.createIcons();
+        return;
+      }
+      catalog.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex gap-3 items-start';
+        div.innerHTML = `
+          <img src="${p.image || ''}" class="w-16 h-16 rounded-lg object-cover flex-shrink-0 bg-gray-100" onerror="this.style.display='none'">
+          <div class="flex-1 min-w-0">
+            <h4 class="font-bold text-sm text-gray-900 truncate">${p.name}</h4>
+            <p class="text-xs text-gray-500">${p.category || ''} • ₹${p.price}/unit • MOQ: ${p.moq || 'N/A'}</p>
+            <p class="text-xs text-gray-400 truncate">${p.material || ''}</p>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button type="button" class="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 edit-prod" data-id="${p.id}"><i data-lucide="edit" style="width:14px;height:14px;"></i></button>
+            <button type="button" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 del-prod" data-id="${p.id}"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+          </div>
+        `;
+        adminContent.appendChild(div);
+      });
+      lucide.createIcons();
+      adminContent.querySelectorAll('.edit-prod').forEach(btn => btn.addEventListener('click', () => openEditProduct(btn.dataset.id)));
+      adminContent.querySelectorAll('.del-prod').forEach(btn => btn.addEventListener('click', () => confirmDeleteProduct(btn.dataset.id)));
+    }
+
+    addProductBtn.addEventListener('click', () => {
+      editingProductId = null;
+      modalTitle.textContent = 'Add Product';
+      productForm.reset();
+      productModal.classList.remove('hidden');
+    });
+    modalCancel.addEventListener('click', () => productModal.classList.add('hidden'));
+
+    function openEditProduct(id) {
+      const p = getCatalog().find(x => x.id === id);
+      if (!p) return;
+      editingProductId = id;
+      modalTitle.textContent = 'Edit Product';
+      document.getElementById('pf-name').value = p.name;
+      document.getElementById('pf-category').value = p.category || '';
+      document.getElementById('pf-sizes').value = p.sizes || '';
+      document.getElementById('pf-material').value = p.material || '';
+      document.getElementById('pf-printing').value = p.printing || '';
+      document.getElementById('pf-moq').value = p.moq || '';
+      document.getElementById('pf-price').value = p.price || '';
+      document.getElementById('pf-image').value = p.image || '';
+      document.getElementById('pf-desc').value = p.desc || '';
+      productModal.classList.remove('hidden');
+    }
+
+    function confirmDeleteProduct(id) {
+      deletingProductId = id;
+      deleteConfirm.classList.remove('hidden');
+    }
+    deleteYes.addEventListener('click', () => {
+      if (deletingProductId) {
+        let catalog = getCatalog().filter(p => p.id !== deletingProductId);
+        saveCatalog(catalog);
+        renderAdmin();
+      }
+      deletingProductId = null;
+      deleteConfirm.classList.add('hidden');
+    });
+    deleteNo.addEventListener('click', () => {
+      deletingProductId = null;
+      deleteConfirm.classList.add('hidden');
+    });
+
+    productForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = {
+        id: editingProductId || Date.now().toString(36),
+        name: document.getElementById('pf-name').value.trim(),
+        category: document.getElementById('pf-category').value.trim(),
+        sizes: document.getElementById('pf-sizes').value.trim(),
+        material: document.getElementById('pf-material').value.trim(),
+        printing: document.getElementById('pf-printing').value.trim(),
+        moq: parseInt(document.getElementById('pf-moq').value) || 100,
+        price: parseFloat(document.getElementById('pf-price').value) || 5,
+        image: document.getElementById('pf-image').value.trim(),
+        desc: document.getElementById('pf-desc').value.trim(),
+      };
+      let catalog = getCatalog();
+      if (editingProductId) {
+        catalog = catalog.map(p => p.id === editingProductId ? data : p);
+      } else {
+        catalog.push(data);
+      }
+      saveCatalog(catalog);
+      productModal.classList.add('hidden');
+      renderAdmin();
+    });
+
+    // Chat logic
+    const steps = [
+      { field:"customer_name", ask:"Hi! 👋 Welcome to PACKPRO — your packaging partner.\n\nLet's get your order sorted. What's your name?" },
+      { field:"mobile", ask:name => `Nice to meet you, ${name}! 😊\n\nCould you share your mobile? We might need it for coordination.` },
+      { field:"business_name", ask:"What's your business called? (Optional — you can skip this)", options:["Skip"] },
+      { field:"product", ask:"Perfect! Let's find the right packaging for you.\n\nBrowse our catalog 📦 — what catches your eye?", showCatalog: true },
+      { field:"size", ask: null },
+      { field:"quantity", ask:"How many units are you looking for?", options:["100","250","500","1000","2500","5000","10000+"] },
+      { field:"printing", ask:"Do you want any printing or branding on these?", dynamicPrinting: true },
+      { field:"location", ask:"Which city or area should we ship to?" },
+      { field:"address", ask:"What's your delivery address?" },
+      { field:"pincode", ask:"And the pincode?" },
+      { field:"delivery_date", ask:"When do you need this by?", options:["Within 3 days","Within 1 week","Within 2 weeks","No rush"] },
+      { field:"notes", ask:"Any special requirements we should know about?", options:["No special requirements"] },
+    ];
+
+    const handler = { onDataChanged(data) { orders = data; } };
+
+    async function init() {
+      await window.dataSdk.init(handler);
+      setTimeout(() => addBot(steps[0].ask), 400);
+    }
+
+    function addBot(text, options) {
+      const tpl = document.getElementById('bot-msg-tpl');
+      const el = tpl.content.cloneNode(true);
+      el.querySelector('[data-template-id="bot-text"]').textContent = text;
+      chat.appendChild(el);
+      if (options) addOptions(options);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addProductCards() {
+      const catalog = getCatalog();
+      catalog.forEach(p => {
+        const tpl = document.getElementById('product-card-tpl');
+        const el = tpl.content.cloneNode(true);
+        const card = el.querySelector('div');
+        const imgEl = card.querySelector('.product-card-img');
+        imgEl.dataset.templateId = p.image;
+        card.querySelector('.product-card-name').textContent = p.name;
+        card.querySelector('.product-card-category').textContent = p.category || '';
+        card.querySelector('.product-card-desc').textContent = p.desc || '';
+        card.querySelector('.product-card-price').textContent = '₹' + p.price + '/unit';
+        card.querySelector('.product-card-moq').textContent = 'MOQ: ' + (p.moq || 100);
+        card.querySelector('.product-card-select').addEventListener('click', () => handleUserMsg(p.name));
+        chat.appendChild(el);
+      });
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addOptions(options) {
+      const tpl = document.getElementById('options-tpl');
+      const el = tpl.content.cloneNode(true);
+      const wrap = el.querySelector('div');
+      options.forEach(o => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition';
+        btn.textContent = o;
+        btn.onclick = () => handleUserMsg(o);
+        wrap.appendChild(btn);
+      });
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addUser(text) {
+      const tpl = document.getElementById('user-msg-tpl');
+      const el = tpl.content.cloneNode(true);
+      el.querySelector('[data-template-id="user-text"]').textContent = text;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function calcPrice() {
+      const product = getProduct(currentOrder.product);
+      const qty = parseInt(currentOrder.quantity) || 100;
+      const base = product ? product.price : 8;
+      let multiplier = 1;
+      if (currentOrder.printing && currentOrder.printing.toLowerCase().includes('single')) multiplier = 1.3;
+      else if (currentOrder.printing && currentOrder.printing.toLowerCase().includes('multi')) multiplier = 1.6;
+      else if (currentOrder.printing && currentOrder.printing.toLowerCase().includes('custom')) multiplier = 1.8;
+      const total = Math.round(base * qty * multiplier);
+      const delivery = qty > 2500 ? 0 : 150;
+      return { unitPrice: Math.round(base * multiplier * 100)/100, total, delivery, grand: total + delivery };
+    }
+
+    function getPaymentInfo() {
+      const d = getPaymentDetails();
+      return {
+        upi: d.upi || 'packpro@upi',
+        account: d.account || 'XXXX-XXXX-1234',
+        ifsc: d.ifsc || 'SBIN0001234',
+        holder: d.holder || 'PACKPRO Industries'
+      };
+    }
+
+    function showSummary() {
+      const p = calcPrice();
+      currentOrder.estimated_price = "₹" + p.grand;
+      const summary = `📋 ORDER SUMMARY\n━━━━━━━━━━━━━━━━━━━━━━\n👤 ${currentOrder.customer_name}\n📞 ${currentOrder.mobile}\n🏢 ${currentOrder.business_name || 'N/A'}\n━━━━━━━━━━━━━━━━━━━━━━\n📦 ${currentOrder.product}\n📐 ${currentOrder.size}\n🔢 ${currentOrder.quantity} units\n🎨 ${currentOrder.printing}\n━━━━━━━━━━━━━━━━━━━━━━\n📍 ${currentOrder.location}\n🏠 ${currentOrder.address}\n📮 ${currentOrder.pincode}\n📅 ${currentOrder.delivery_date}\n━━━━━━━━━━━━━━━━━━━━━━\n💰 PRICING:\n   ₹${p.unitPrice}/unit\n   Subtotal: ₹${p.total}\n   Delivery: ${p.delivery === 0 ? 'FREE' : '₹'+p.delivery}\n   ──────────────────\n   TOTAL: ₹${p.grand}\n━━━━━━━━━━━━━━━━━━━━━━`;
+      addBot(summary);
+      setTimeout(() => {
+        addBot("Does this look good?", ["✅ Confirm Order","✏️ Edit Details","❌ Cancel","💬 Talk to Sales Team"]);
+        awaitingConfirmation = true;
+      }, 600);
+    }
+
+    function showPaymentOptions() {
+      awaitingPayment = true;
+      const p = calcPrice();
+      const advance = Math.round(p.grand * 0.3);
+      addBot(`💳 PAYMENT OPTIONS\nTotal: ₹${p.grand}\n\nHow would you like to pay?\n\n1️⃣ Pay Now — UPI/Bank\n2️⃣ Pay at Delivery\n3️⃣ 30% Advance (₹${advance})\n4️⃣ Discuss Later`, ["💰 Pay Now","📅 Pay Later","💳 30% Advance","⏭️ Discuss Later"]);
+    }
+
+    async function handleUserMsg(text) {
+      if (!text.trim()) return;
+      if (sessionEnded) return;
+      addUser(text);
+
+      if (text.toLowerCase().includes('human') || text.toLowerCase().includes('sales team') || text.toLowerCase().includes('callback')) {
+        addBot("Sure! 🙏 Our team will reach out shortly.\n\n📞 Call: +91-XXXXX-XXXXX\n📩 WhatsApp: same number\n\nCan I help with anything else?");
+        return;
+      }
+
+      if (awaitingPayment) {
+        awaitingPayment = false;
+        const pay = getPaymentInfo();
+        if (text.includes("Pay Now")) {
+          currentOrder.payment_method = "pay_now";
+          currentOrder.payment_status = "pending";
+          addBot(`🔗 PAYMENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━\n\n💳 Amount: ${currentOrder.estimated_price}\n\n📱 UPI: ${pay.upi}\n🏦 Bank: ${pay.holder}\n   A/C: ${pay.account}\n   IFSC: ${pay.ifsc}\n\nOnce paid, share screenshot with our team.\n\n📞 We'll confirm within 30 mins.`);
+          await saveOrder();
+        } else if (text.includes("Pay Later")) {
+          currentOrder.payment_method = "pay_later";
+          currentOrder.payment_status = "pending";
+          addBot("✅ Got it! Pay when we deliver.\n\n📞 Our team will contact you within 2 hours to confirm details.");
+          await saveOrder();
+        } else if (text.includes("Advance")) {
+          const p = calcPrice();
+          const advance = Math.round(p.grand * 0.3);
+          currentOrder.payment_method = "advance";
+          currentOrder.payment_status = "advance_pending";
+          currentOrder.advance_amount = "₹" + advance;
+          addBot(`✅ 30% Advance Payment\n💳 Amount: ₹${advance}\nBalance: ₹${p.grand - advance} (before shipping)\n\n📱 UPI: ${pay.upi}\n\nShare confirmation with our team.`);
+          await saveOrder();
+        } else {
+          currentOrder.payment_method = "skipped";
+          currentOrder.payment_status = "not_initiated";
+          addBot("⏭️ No problem! Our sales team will discuss payment when they reach out.\n\n📞 You'll hear from us soon.");
+          await saveOrder();
+        }
+        setTimeout(() => {
+          addBot("Anything else I can help with?", ["Start New Order", "End Chat"]);
+        }, 1000);
+        return;
+      }
+
+      if (awaitingConfirmation) {
+        awaitingConfirmation = false;
+        if (text.includes("Confirm")) {
+          addBot("✅ Perfect! Let's set up payment...");
+          setTimeout(() => showPaymentOptions(), 600);
+        } else if (text.includes("Edit")) {
+          addBot("No problem! Let's start fresh.\n\nWhat's your name?");
+          step = 0; currentOrder = {};
+        } else if (text.includes("Cancel")) {
+          addBot("No worries! 😊 Feel free to reach out anytime.", ["Start New Order", "End Chat"]);
+          step = 0; currentOrder = {}; awaitingConfirmation = false;
+        } else if (text.includes("Sales")) {
+          addBot("Connecting you to our sales team... 📞\nThey'll be in touch within 30 minutes. Thanks! 🙏");
+          await saveOrder();
+          setTimeout(() => {
+            addBot("Anything else?", ["Start New Order", "End Chat"]);
+          }, 800);
+        } else {
+          addBot("Please select an option:", ["✅ Confirm Order","✏️ Edit Details","❌ Cancel","💬 Talk to Sales Team"]);
+          awaitingConfirmation = true;
+        }
+        return;
+      }
+
+      if (text.includes("End Chat") || text.toLowerCase().includes("close chat") || text.toLowerCase().includes('goodbye')) {
+        sessionEnded = true;
+        addBot("Thank you for choosing PACKPRO! 👋\n\nOur team will be in touch soon. Have a great day!");
+        input.disabled = true;
+        form.style.opacity = "0.5";
+        return;
+      }
+
+      if (text === "Yes" || text === "Start New Order" || text === "Continue Order") {
+        if (sessionEnded) {
+          sessionEnded = false;
+          input.disabled = false;
+          form.style.opacity = "1";
+        }
+        step = 0; currentOrder = {}; awaitingConfirmation = false;
+        setTimeout(() => addBot("Great! Let's get started.\n\nMay I know your name?"), 300);
+        return;
+      }
+      if (text === "No thanks") {
+        addBot("Understood! Feel free to reach out anytime. 😊");
+        input.disabled = true;
+        form.style.opacity = "0.5";
+        return;
+      }
+
+      const current = steps[step];
+      if (current.field === "business_name" && text === "Skip") currentOrder.business_name = "";
+      else if (current.field === "notes" && text === "No special requirements") currentOrder.notes = "";
+      else currentOrder[current.field] = text;
+      step++;
+
+      if (step >= steps.length) {
+        setTimeout(() => showSummary(), 500);
+        return;
+      }
+
+      setTimeout(() => {
+        const next = steps[step];
+        if (next.field === "size") {
+          const product = getProduct(currentOrder.product);
+          const sizes = product ? product.sizes.split(',').map(s=>s.trim()) : ["Small","Medium","Large","Custom"];
+          addBot(`What size for ${currentOrder.product}?`, sizes);
+        } else if (next.showCatalog) {
+          addBot(next.ask);
+          setTimeout(() => {
+            addProductCards();
+            addOptions(getProductNames());
+          }, 300);
+        } else if (next.dynamicPrinting) {
+          const product = getProduct(currentOrder.product);
+          const opts = product && product.printing ? product.printing.split(',').map(s=>s.trim()) : ["No Printing","Single Color Print","Multi-Color Print","Custom Design"];
+          addBot("Printing needed?", opts);
+        } else {
+          let askText = typeof next.ask === 'function' ? next.ask(currentOrder.customer_name) : next.ask;
+          addBot(askText, next.options);
+        }
+      }, 500);
+    }
+
+    async function saveOrder() {
+      if (orders.length >= 999) {
+        addBot("⚠️ Order queue limit reached. Please contact sales team directly.");
+        return;
+      }
+      currentOrder.order_id = 'PKP-' + Date.now().toString(36).toUpperCase();
+      currentOrder.status = 'confirmed';
+      currentOrder.created_at = new Date().toISOString();
+      if (!currentOrder.payment_method) currentOrder.payment_method = '';
+      if (!currentOrder.payment_status) currentOrder.payment_status = '';
+      if (!currentOrder.advance_amount) currentOrder.advance_amount = '';
+
+      const result = await window.dataSdk.create(currentOrder);
+      if (result.isOk) {
+        addBot(`🆔 Order ID: ${currentOrder.order_id}\n📦 ${currentOrder.product} (${currentOrder.size})\n💰 ${currentOrder.estimated_price}\n\nThank you, ${currentOrder.customer_name}! 🙏`);
+      } else {
+        addBot("❌ Error saving order. Please try again or contact sales.", ["Retry","Talk to Sales Team"]);
+      }
+      step = 0; currentOrder = {};
+    }
+
+    humanBtn.addEventListener('click', () => {
+      addBot("🤝 Sales team support:\n\n📞 Call: +91-XXXXX-XXXXX\n📩 WhatsApp: +91-XXXXX-XXXXX\n⏰ Mon-Sat, 9 AM - 7 PM", ["Request Callback","Continue Chatting"]);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = input.value.trim();
+      if (!val) return;
+      input.value = '';
+      handleUserMsg(val);
+    });
+
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a01c533738ce6ebf',t:'MTc3OTc5MzczOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
