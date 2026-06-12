@@ -1,21 +1,27 @@
 // src/lib/db.ts
-// Prisma singleton with graceful handling for environments without a real DB
+// Prisma singleton — handles both dev hot-reload and Vercel serverless/Neon
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+declare global {
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined;
+}
 
 function createPrismaClient() {
-  const client = new PrismaClient({
+  return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    // Neon + Vercel serverless: keep connection limit low
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
-  return client;
 }
 
+// In production (Vercel), create a new client per invocation.
+// In development, reuse the global to avoid too many connections.
 export const db: PrismaClient =
-  globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
-}
+  process.env.NODE_ENV === "production"
+    ? createPrismaClient()
+    : (globalThis.prisma ?? (globalThis.prisma = createPrismaClient()));
