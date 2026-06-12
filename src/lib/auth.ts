@@ -8,6 +8,9 @@ if (!process.env.NEXTAUTH_SECRET) {
   console.warn("[next-auth] NEXTAUTH_SECRET not set. Using fallback — set it in environment variables for production.");
 }
 
+// Auto-detect NEXTAUTH_URL on Vercel if not explicitly set
+process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt", maxAge: 8 * 60 * 60 }, // 8 hours

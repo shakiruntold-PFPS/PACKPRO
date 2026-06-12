@@ -139,8 +139,25 @@ function LoginForm() {
               ].map(acc => (
                 <button key={acc.label} type="button"
                   className="btn-ghost justify-center"
-                  style={{ padding:"7px 4px", fontSize:"11px" }}
-                  onClick={() => { setEmail(acc.email); setPassword(acc.pw); }}>
+                  style={{ padding:"7px 4px", fontSize:"11px", border:"1px solid rgba(14,165,160,0.3)" }}
+                  onClick={async () => {
+                    setEmail(acc.email);
+                    setPassword(acc.pw);
+                    setError("");
+                    setLoading(true);
+                    const result = await signIn("credentials", {
+                      email: acc.email,
+                      password: acc.pw,
+                      redirect: false,
+                    });
+                    setLoading(false);
+                    if (result?.error) {
+                      setError("Demo account not available — database may not be seeded.");
+                    } else {
+                      router.push("/admin/dashboard");
+                      router.refresh();
+                    }
+                  }}>
                   {acc.label}
                 </button>
               ))}

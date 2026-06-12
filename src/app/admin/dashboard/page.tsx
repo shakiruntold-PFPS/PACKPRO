@@ -90,9 +90,32 @@ export default function DashboardPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl mb-5 text-sm"
-          style={{ background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", color:"#ef4444" }}>
-          {error} — Check that DATABASE_URL and NEXTAUTH_SECRET are set in your deployment environment.
+        <div className="mb-6">
+          <div className="rounded-2xl p-6"
+            style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background:"rgba(239,68,68,0.2)" }}>
+                <AlertTriangle size={20} style={{ color:"#ef4444" }} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white mb-1">Database not connected — Setup required</h3>
+                <p className="text-sm mb-4" style={{ color:"#ef4444" }}>{error}</p>
+                <div className="rounded-xl p-4 text-sm space-y-2"
+                  style={{ background:"rgba(0,0,0,0.3)", border:"1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="font-semibold text-white mb-3">To fix this, set these environment variables in Vercel:</p>
+                  <div className="space-y-1 font-mono text-xs" style={{ color:"#14c7c0" }}>
+                    <div>DATABASE_URL=<span style={{ color:"#8ba5c8" }}>postgresql://user:pass@host/db</span></div>
+                    <div>NEXTAUTH_SECRET=<span style={{ color:"#8ba5c8" }}>your-secret-key</span></div>
+                    <div>NEXTAUTH_URL=<span style={{ color:"#8ba5c8" }}>https://your-app.vercel.app</span></div>
+                  </div>
+                  <p className="text-xs mt-3" style={{ color:"#8ba5c8" }}>
+                    Go to Vercel Dashboard → Your Project → Settings → Environment Variables, then redeploy.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
