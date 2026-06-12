@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { Plus, Search, Package } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Search, RefreshCw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 const STATUS_STYLE: Record<string,string> = {
@@ -8,32 +8,44 @@ const STATUS_STYLE: Record<string,string> = {
   PARTIAL:"badge-amber", RECEIVED:"badge-green", CANCELLED:"badge-red"
 };
 
-const MOCK_POS = [
-  { id:"1", number:"PO-2506-001", vendor:{ name:"Raj Paper Mills" }, date:"2025-06-05", expectedDate:"2025-06-12", total:185000, taxAmount:33300, status:"CONFIRMED", items:3 },
-  { id:"2", number:"PO-2506-002", vendor:{ name:"PET Solutions Pvt Ltd" }, date:"2025-06-03", expectedDate:"2025-06-10", total:96000, taxAmount:17280, status:"PARTIAL", items:2 },
-  { id:"3", number:"PO-2506-003", vendor:{ name:"EcoWrap Industries" }, date:"2025-05-28", expectedDate:"2025-06-05", total:54000, taxAmount:6480, status:"RECEIVED", items:4 },
-  { id:"4", number:"PO-2506-004", vendor:{ name:"Kraft Box Makers" }, date:"2025-06-08", expectedDate:"2025-06-18", total:42000, taxAmount:5040, status:"DRAFT", items:2 },
-];
-
 export default function PurchasesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [orders, setOrders] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const filtered = MOCK_POS.filter(p=>
-    (statusFilter==="ALL" || p.status===statusFilter) &&
-    (!search || p.number.includes(search) || p.vendor.name.toLowerCase().includes(search.toLowerCase()))
-  );
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: "50" });
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/purchases?${params}`);
+      const json = await res.json();
+      setOrders(json.data?.data ?? []);
+      setTotal(json.data?.total ?? 0);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, statusFilter]);
 
-  const totalActive = MOCK_POS.filter(p=>!["RECEIVED","CANCELLED"].includes(p.status)).reduce((s,p)=>s+p.total,0);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const totalActive = orders
+    .filter((p:any) => !["RECEIVED","CANCELLED"].includes(p.status))
+    .reduce((s:number, p:any) => s + (p.total ?? 0), 0);
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div>
           <h1 className="module-title">Purchase Orders</h1>
-          <p className="module-subtitle">Active: ₹{(totalActive/100000).toFixed(1)}L · {MOCK_POS.length} orders</p>
+          <p className="module-subtitle">Active: ₹{(totalActive/100000).toFixed(1)}L · {total} orders</p>
         </div>
-        <button className="btn-primary"><Plus size={14}/> New PO</button>
+        <button className="btn-ghost" onClick={fetchOrders}>
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""}/> Refresh
+        </button>
       </div>
 
       <div className="flex gap-3 mb-5 flex-wrap">
@@ -55,16 +67,22 @@ export default function PurchasesPage() {
             <tr>{["PO #","Vendor","Date","Expected","Items","Tax","Total","Status"].map(h=><th key={h}>{h}</th>)}</tr>
           </thead>
           <tbody>
-            {filtered.map(po=>(
+            {loading && (
+              <tr><td colSpan={8} className="text-center py-8" style={{ color:"var(--muted)" }}>Loading…</td></tr>
+            )}
+            {!loading && orders.length === 0 && (
+              <tr><td colSpan={8} className="text-center py-8" style={{ color:"var(--muted)" }}>No purchase orders found</td></tr>
+            )}
+            {orders.map((po:any)=>(
               <tr key={po.id}>
                 <td className="font-bold" style={{ color:"#14c7c0" }}>{po.number}</td>
-                <td className="font-semibold text-white">{po.vendor.name}</td>
-                <td style={{ color:"var(--muted)" }}>{formatDate(po.date)}</td>
-                <td style={{ color:"var(--muted)" }}>{formatDate(po.expectedDate)}</td>
-                <td style={{ color:"var(--muted)" }}>{po.items} items</td>
-                <td style={{ color:"var(--muted)" }}>₹{po.taxAmount.toLocaleString("en-IN")}</td>
-                <td className="font-bold text-white">₹{po.total.toLocaleString("en-IN")}</td>
-                <td><span className={`badge ${STATUS_STYLE[po.status]}`}>{po.status}</span></td>
+                <td className="font-semibold text-white">{po.vendor?.name ?? "—"}</td>
+                <td style={{ color:"var(--muted)" }}>{formatDate(po.createdAt)}</td>
+                <td style={{ color:"var(--muted)" }}>{po.expectedDate ? formatDate(po.expectedDate) : "—"}</td>
+                <td style={{ color:"var(--muted)" }}>{po._count?.items ?? 0} items</td>
+                <td style={{ color:"var(--muted)" }}>₹{(po.taxAmount??0).toLocaleString("en-IN")}</td>
+                <td className="font-bold text-white">₹{(po.total??0).toLocaleString("en-IN")}</td>
+                <td><span className={`badge ${STATUS_STYLE[po.status]??""}`}>{po.status}</span></td>
               </tr>
             ))}
           </tbody>

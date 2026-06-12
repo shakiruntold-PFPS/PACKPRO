@@ -1,20 +1,12 @@
 "use client";
-import { useState } from "react";
-import { Plus, Search, Send, Eye, FileText, CheckCircle, XCircle } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Plus, Search, Send, Eye, RefreshCw, CheckCircle } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 const STATUS_STYLE: Record<string,string> = {
   DRAFT:"badge-gray", SENT:"badge-blue", VIEWED:"badge-purple",
   APPROVED:"badge-green", REJECTED:"badge-red", EXPIRED:"badge-orange", CONVERTED:"badge-teal"
 };
-
-const MOCK_QUOTES = [
-  { id:"1", number:"PPQ-2506-001", party:{ name:"Spice Route Restaurant", phone:"+91 98765 43210" }, createdBy:"Rahul S.", status:"SENT", validTill:"2025-06-22", subtotal:38500, taxAmount:6930, total:45430, items:[ { product:"Paper Cups 8oz", qty:500, unit:"pcs", unitPrice:65, gstRate:18, total:38350 }, { product:"Meal Box Large", qty:100, unit:"pcs", unitPrice:45, gstRate:12, total:5040 } ] },
-  { id:"2", number:"PPQ-2506-002", party:{ name:"Cloud Bites Kitchen", phone:"+91 87654 32109" }, createdBy:"Rahul S.", status:"APPROVED", validTill:"2025-06-25", subtotal:98000, taxAmount:17640, total:115640, items:[] },
-  { id:"3", number:"PPQ-2506-003", party:{ name:"The Coffee Lab", phone:"+91 76543 21098" }, createdBy:"Sneha G.", status:"DRAFT", validTill:"2025-06-28", subtotal:55000, taxAmount:9900, total:64900, items:[] },
-  { id:"4", number:"PPQ-2506-004", party:{ name:"Sweet Temptations", phone:"+91 65432 10987" }, createdBy:"Rahul S.", status:"REJECTED", validTill:"2025-06-15", subtotal:22000, taxAmount:3960, total:25960, items:[] },
-  { id:"5", number:"PPQ-2506-005", party:{ name:"FreshFarm Delivery", phone:"+91 54321 09876" }, createdBy:"Sneha G.", status:"CONVERTED", validTill:"2025-06-30", subtotal:76000, taxAmount:13680, total:89680, items:[] },
-];
 
 function QuoteModal({ quote, onClose }: any) {
   if (!quote) return null;
@@ -29,7 +21,7 @@ function QuoteModal({ quote, onClose }: any) {
             <div>
               <div className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color:"#14c7c0" }}>Quotation</div>
               <h2 className="text-xl font-black text-white">{quote.number}</h2>
-              <div className="text-sm mt-1" style={{ color:"var(--muted)" }}>{quote.party.name}</div>
+              <div className="text-sm mt-1" style={{ color:"var(--muted)" }}>{quote.party?.name}</div>
             </div>
             <div className="flex items-center gap-2">
               <span className={`badge ${STATUS_STYLE[quote.status]}`}>{quote.status}</span>
@@ -38,26 +30,26 @@ function QuoteModal({ quote, onClose }: any) {
           </div>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            {[["Valid Till",formatDate(quote.validTill)],["Created By",quote.createdBy],["Phone",quote.party.phone]].map(([k,v])=>(
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            {[["Valid Till", quote.validTill ? formatDate(quote.validTill) : "—"], ["Created By", quote.createdBy?.name ?? "—"]].map(([k,v])=>(
               <div key={k} className="rounded-xl p-3" style={{ background:"var(--glass)", border:"1px solid var(--border)" }}>
                 <div className="erp-label mb-1" style={{ fontSize:10 }}>{k}</div>
                 <div className="text-sm font-semibold text-white">{v}</div>
               </div>
             ))}
           </div>
-          {quote.items.length > 0 && (
+          {quote.items && quote.items.length > 0 && (
             <div className="mb-5 glass rounded-xl overflow-auto">
               <table className="erp-table">
                 <thead><tr>{["Product","Qty","Rate","GST","Total"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {quote.items.map((item: any, i: number) => (
                     <tr key={i}>
-                      <td className="font-semibold text-white">{item.product}</td>
+                      <td className="font-semibold text-white">{item.product?.name ?? "—"}</td>
                       <td style={{ color:"var(--muted)" }}>{item.qty} {item.unit}</td>
                       <td style={{ color:"var(--muted)" }}>₹{item.unitPrice}</td>
                       <td style={{ color:"var(--muted)" }}>{item.gstRate}%</td>
-                      <td className="font-bold text-white">₹{item.total.toLocaleString("en-IN")}</td>
+                      <td className="font-bold text-white">₹{(item.total??0).toLocaleString("en-IN")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -65,13 +57,13 @@ function QuoteModal({ quote, onClose }: any) {
             </div>
           )}
           <div className="rounded-xl p-4 mb-5" style={{ background:"var(--glass)", border:"1px solid var(--border)" }}>
-            {[["Subtotal",`₹${quote.subtotal.toLocaleString("en-IN")}`],["GST",`₹${quote.taxAmount.toLocaleString("en-IN")}`]].map(([k,v])=>(
+            {[["Subtotal",`₹${(quote.subtotal??0).toLocaleString("en-IN")}`],["GST",`₹${(quote.taxAmount??0).toLocaleString("en-IN")}`]].map(([k,v])=>(
               <div key={k} className="flex justify-between text-sm py-1">
                 <span style={{ color:"var(--muted)" }}>{k}</span><span className="text-white">{v}</span>
               </div>
             ))}
             <div className="flex justify-between font-bold pt-2 border-t text-white" style={{ borderColor:"var(--border)" }}>
-              <span>Total</span><span style={{ color:"#14c7c0" }}>₹{quote.total.toLocaleString("en-IN")}</span>
+              <span>Total</span><span style={{ color:"#14c7c0" }}>₹{(quote.total??0).toLocaleString("en-IN")}</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -90,22 +82,41 @@ export default function QuotesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selected, setSelected] = useState<any>(null);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const filtered = MOCK_QUOTES.filter(q=>
-    (statusFilter==="ALL" || q.status===statusFilter) &&
-    (!search || q.number.includes(search) || q.party.name.toLowerCase().includes(search.toLowerCase()))
-  );
+  const fetchQuotes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: "50" });
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/quotes?${params}`);
+      const json = await res.json();
+      setQuotes(json.data?.data ?? []);
+      setTotal(json.data?.total ?? 0);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, statusFilter]);
 
-  const pipelineValue = MOCK_QUOTES.filter(q=>!["REJECTED","EXPIRED"].includes(q.status)).reduce((s,q)=>s+q.total,0);
+  useEffect(() => { fetchQuotes(); }, [fetchQuotes]);
+
+  const pipelineValue = quotes
+    .filter((q:any) => !["REJECTED","EXPIRED"].includes(q.status))
+    .reduce((s:number, q:any) => s + (q.total ?? 0), 0);
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div>
           <h1 className="module-title">Quotations</h1>
-          <p className="module-subtitle">Pipeline: ₹{(pipelineValue/100000).toFixed(1)}L · {MOCK_QUOTES.length} quotes</p>
+          <p className="module-subtitle">Pipeline: ₹{(pipelineValue/100000).toFixed(1)}L · {total} quotes</p>
         </div>
-        <button className="btn-primary"><Plus size={14}/> New Quote</button>
+        <button className="btn-ghost" onClick={fetchQuotes}>
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""}/> Refresh
+        </button>
       </div>
 
       <div className="flex gap-3 mb-5 flex-wrap">
@@ -129,16 +140,22 @@ export default function QuotesPage() {
             <tr>{["Quote #","Customer","Created By","Valid Till","Subtotal","GST","Total","Status","Actions"].map(h=><th key={h}>{h}</th>)}</tr>
           </thead>
           <tbody>
-            {filtered.map(q=>(
+            {loading && (
+              <tr><td colSpan={9} className="text-center py-8" style={{ color:"var(--muted)" }}>Loading…</td></tr>
+            )}
+            {!loading && quotes.length === 0 && (
+              <tr><td colSpan={9} className="text-center py-8" style={{ color:"var(--muted)" }}>No quotes found</td></tr>
+            )}
+            {quotes.map((q:any)=>(
               <tr key={q.id} className="cursor-pointer" onClick={()=>setSelected(q)}>
                 <td className="font-bold" style={{ color:"#14c7c0" }}>{q.number}</td>
-                <td className="font-semibold text-white">{q.party.name}</td>
-                <td style={{ color:"var(--muted)" }}>{q.createdBy}</td>
-                <td style={{ color:"var(--muted)" }}>{formatDate(q.validTill)}</td>
-                <td style={{ color:"var(--muted)" }}>₹{q.subtotal.toLocaleString("en-IN")}</td>
-                <td style={{ color:"var(--muted)" }}>₹{q.taxAmount.toLocaleString("en-IN")}</td>
-                <td className="font-bold text-white">₹{q.total.toLocaleString("en-IN")}</td>
-                <td><span className={`badge ${STATUS_STYLE[q.status]}`}>{q.status}</span></td>
+                <td className="font-semibold text-white">{q.party?.name ?? "—"}</td>
+                <td style={{ color:"var(--muted)" }}>{q.createdBy?.name ?? "—"}</td>
+                <td style={{ color:"var(--muted)" }}>{q.validTill ? formatDate(q.validTill) : "—"}</td>
+                <td style={{ color:"var(--muted)" }}>₹{(q.subtotal??0).toLocaleString("en-IN")}</td>
+                <td style={{ color:"var(--muted)" }}>₹{(q.taxAmount??0).toLocaleString("en-IN")}</td>
+                <td className="font-bold text-white">₹{(q.total??0).toLocaleString("en-IN")}</td>
+                <td><span className={`badge ${STATUS_STYLE[q.status]??""}`}>{q.status}</span></td>
                 <td>
                   <div className="flex gap-1" onClick={e=>e.stopPropagation()}>
                     <button className="btn-ghost p-1.5" onClick={()=>setSelected(q)}><Eye size={12}/></button>
