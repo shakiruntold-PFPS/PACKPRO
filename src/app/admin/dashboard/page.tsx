@@ -1,14 +1,21 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   TrendingUp, TrendingDown, Users, Package, FileText,
   Receipt, AlertTriangle, DollarSign, ShoppingCart, RefreshCw
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
-} from "recharts";
+import { formatDate } from "@/lib/utils";
+
+const AreaChart    = dynamic(() => import("recharts").then(m => m.AreaChart),    { ssr: false });
+const Area         = dynamic(() => import("recharts").then(m => m.Area),         { ssr: false });
+const BarChart     = dynamic(() => import("recharts").then(m => m.BarChart),     { ssr: false });
+const Bar          = dynamic(() => import("recharts").then(m => m.Bar),          { ssr: false });
+const XAxis        = dynamic(() => import("recharts").then(m => m.XAxis),        { ssr: false });
+const YAxis        = dynamic(() => import("recharts").then(m => m.YAxis),        { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
+const Tooltip      = dynamic(() => import("recharts").then(m => m.Tooltip),      { ssr: false });
+const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 
 function KPI({ label, value, sub, icon: Icon, color = "#0ea5a0", trend }: any) {
   return (
@@ -38,15 +45,20 @@ const CHART_COLORS = ["#0ea5a0","#1b4f8a","#f59e0b","#10b981","#ef4444"];
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/dashboard");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json.data);
       setLastUpdated(new Date());
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
@@ -76,6 +88,36 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-6">
+          <div className="rounded-2xl p-6"
+            style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background:"rgba(239,68,68,0.2)" }}>
+                <AlertTriangle size={20} style={{ color:"#ef4444" }} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white mb-1">Database not connected — Setup required</h3>
+                <p className="text-sm mb-4" style={{ color:"#ef4444" }}>{error}</p>
+                <div className="rounded-xl p-4 text-sm space-y-2"
+                  style={{ background:"rgba(0,0,0,0.3)", border:"1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="font-semibold text-white mb-3">To fix this, set these environment variables in Vercel:</p>
+                  <div className="space-y-1 font-mono text-xs" style={{ color:"#14c7c0" }}>
+                    <div>DATABASE_URL=<span style={{ color:"#8ba5c8" }}>postgresql://user:pass@host/db</span></div>
+                    <div>NEXTAUTH_SECRET=<span style={{ color:"#8ba5c8" }}>your-secret-key</span></div>
+                    <div>NEXTAUTH_URL=<span style={{ color:"#8ba5c8" }}>https://your-app.vercel.app</span></div>
+                  </div>
+                  <p className="text-xs mt-3" style={{ color:"#8ba5c8" }}>
+                    Go to Vercel Dashboard → Your Project → Settings → Environment Variables, then redeploy.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <KPI label="Monthly Revenue" value={`₹${((kpi.monthlyRevenue??0)/100000).toFixed(1)}L`} sub="Current month invoices" icon={TrendingUp} color="#0ea5a0"/>
@@ -118,8 +160,8 @@ export default function DashboardPage() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-48" style={{ color:"var(--muted)" }}>
-              No revenue data yet
+            <div className="flex items-center justify-center h-48 text-sm" style={{ color:"var(--muted)" }}>
+              {loading ? "Loading chart…" : "No revenue data yet — create invoices to see trends"}
             </div>
           )}
         </div>
@@ -138,7 +180,9 @@ export default function DashboardPage() {
               </div>
             </div>
           )) : (
-            <div className="flex items-center justify-center h-32" style={{ color:"var(--muted)" }}>No data yet</div>
+            <div className="flex items-center justify-center h-32 text-sm" style={{ color:"var(--muted)" }}>
+              {loading ? "Loading…" : "No product data yet"}
+            </div>
           )}
         </div>
       </div>
@@ -164,7 +208,9 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-6" style={{ color:"var(--muted)" }}>No recent activity</div>
+          <div className="text-center py-6 text-sm" style={{ color:"var(--muted)" }}>
+            {loading ? "Loading…" : "No recent activity recorded yet"}
+          </div>
         )}
       </div>
     </div>

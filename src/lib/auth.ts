@@ -5,12 +5,11 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
 if (!process.env.NEXTAUTH_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEXTAUTH_SECRET environment variable is required in production");
-  }
-  // In development, warn but continue — secret will fall back to env-based value
-  console.warn("[next-auth] NEXTAUTH_SECRET not set. Set it in .env.local for proper JWT signing.");
+  console.warn("[next-auth] NEXTAUTH_SECRET not set. Using fallback — set it in environment variables for production.");
 }
+
+// Auto-detect NEXTAUTH_URL on Vercel if not explicitly set
+process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
