@@ -129,13 +129,22 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t text-center" style={{ borderColor: "var(--border)" }}>
-            <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Need help?{" "}
-              <a href="mailto:support@packpro.site" className="font-semibold" style={{ color: "#14c7c0" }}>
-                Contact IT Support
-              </a>
-            </p>
+          <div className="mt-5 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
+            <p className="text-xs mb-3 text-center" style={{ color: "var(--muted)" }}>Quick login (demo accounts)</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Admin", email: "admin@packpro.site", pw: "packpro@2025" },
+                { label: "Sales", email: "rahul@packpro.site", pw: "sales@2025" },
+                { label: "Accounts", email: "priya@packpro.site", pw: "accounts@2025" },
+              ].map(acc => (
+                <button key={acc.label} type="button"
+                  className="btn-ghost justify-center"
+                  style={{ padding:"7px 4px", fontSize:"11px" }}
+                  onClick={() => { setEmail(acc.email); setPassword(acc.pw); }}>
+                  {acc.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

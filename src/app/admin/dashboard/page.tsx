@@ -1,14 +1,21 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   TrendingUp, TrendingDown, Users, Package, FileText,
   Receipt, AlertTriangle, DollarSign, ShoppingCart, RefreshCw
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
-} from "recharts";
+import { formatDate } from "@/lib/utils";
+
+const AreaChart    = dynamic(() => import("recharts").then(m => m.AreaChart),    { ssr: false });
+const Area         = dynamic(() => import("recharts").then(m => m.Area),         { ssr: false });
+const BarChart     = dynamic(() => import("recharts").then(m => m.BarChart),     { ssr: false });
+const Bar          = dynamic(() => import("recharts").then(m => m.Bar),          { ssr: false });
+const XAxis        = dynamic(() => import("recharts").then(m => m.XAxis),        { ssr: false });
+const YAxis        = dynamic(() => import("recharts").then(m => m.YAxis),        { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
+const Tooltip      = dynamic(() => import("recharts").then(m => m.Tooltip),      { ssr: false });
+const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 
 function KPI({ label, value, sub, icon: Icon, color = "#0ea5a0", trend }: any) {
   return (
@@ -38,15 +45,20 @@ const CHART_COLORS = ["#0ea5a0","#1b4f8a","#f59e0b","#10b981","#ef4444"];
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/dashboard");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json.data);
       setLastUpdated(new Date());
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
@@ -76,6 +88,13 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl mb-5 text-sm"
+          style={{ background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", color:"#ef4444" }}>
+          {error} — Check that DATABASE_URL and NEXTAUTH_SECRET are set in your deployment environment.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <KPI label="Monthly Revenue" value={`₹${((kpi.monthlyRevenue??0)/100000).toFixed(1)}L`} sub="Current month invoices" icon={TrendingUp} color="#0ea5a0"/>
@@ -118,8 +137,8 @@ export default function DashboardPage() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-48" style={{ color:"var(--muted)" }}>
-              No revenue data yet
+            <div className="flex items-center justify-center h-48 text-sm" style={{ color:"var(--muted)" }}>
+              {loading ? "Loading chart…" : "No revenue data yet — create invoices to see trends"}
             </div>
           )}
         </div>
@@ -138,7 +157,9 @@ export default function DashboardPage() {
               </div>
             </div>
           )) : (
-            <div className="flex items-center justify-center h-32" style={{ color:"var(--muted)" }}>No data yet</div>
+            <div className="flex items-center justify-center h-32 text-sm" style={{ color:"var(--muted)" }}>
+              {loading ? "Loading…" : "No product data yet"}
+            </div>
           )}
         </div>
       </div>
@@ -164,7 +185,9 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-6" style={{ color:"var(--muted)" }}>No recent activity</div>
+          <div className="text-center py-6 text-sm" style={{ color:"var(--muted)" }}>
+            {loading ? "Loading…" : "No recent activity recorded yet"}
+          </div>
         )}
       </div>
     </div>

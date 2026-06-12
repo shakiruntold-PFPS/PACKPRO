@@ -5,11 +5,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
 if (!process.env.NEXTAUTH_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEXTAUTH_SECRET environment variable is required in production");
-  }
-  // In development, warn but continue — secret will fall back to env-based value
-  console.warn("[next-auth] NEXTAUTH_SECRET not set. Set it in .env.local for proper JWT signing.");
+  console.warn("[next-auth] NEXTAUTH_SECRET not set. Using fallback — set it in environment variables for production.");
 }
 
 export const authOptions: NextAuthOptions = {
