@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 // src/app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, err } from "@/lib/api";
