@@ -1,0 +1,897 @@
+// PACKPRO ERP — Complete Database Schema
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH & USERS ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(SALES)
+  avatar       String?
+  phone        String?
+  department   String?
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  leads        Lead[]
+  quotes       Quote[]
+  salesOrders  SalesOrder[]
+  activities   Activity[]
+  tasks        Task[]
+  auditLogs    AuditLog[]
+  employees    Employee[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  SALES
+  ACCOUNTS
+  WAREHOUSE
+  PURCHASE
+  HR
+  CUSTOMER
+  VENDOR
+}
+
+// ─── COMPANY SETTINGS ─────────────────────────────────────────────────────────
+
+model CompanySettings {
+  id              String  @id @default("default")
+  name            String  @default("PACKPRO Food Packaging Solutions")
+  tagline         String?
+  address         String  @default("Dholidub, Narnaul-Behror Road, Alwar, Rajasthan")
+  city            String  @default("Alwar")
+  state           String  @default("Rajasthan")
+  pincode         String  @default("301001")
+  country         String  @default("India")
+  phone           String  @default("+91 9057627625")
+  email           String  @default("sales@packpro.site")
+  supportEmail    String  @default("support@packpro.site")
+  website         String  @default("www.packpro.site")
+  gstin           String?
+  pan             String?
+  cin             String?
+  logoUrl         String?
+  bankName        String?
+  bankAccount     String?
+  bankIfsc        String?
+  bankBranch      String?
+  currency        String  @default("INR")
+  currencySymbol  String  @default("₹")
+  invoicePrefix   String  @default("PPQ")
+  invoiceCounter  Int     @default(1)
+  financialYear   String  @default("2025-26")
+  gstRate         Float   @default(18)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+// ─── PRODUCT MASTER ────────────────────────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  icon        String?
+  image       String?
+  parentId    String?
+  parent      Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  name            String
+  code            String        @unique
+  sku             String?
+  hsnCode         String?
+  gstRate         Float         @default(18)
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id])
+  subcategory     String?
+  brand           String?
+  unit            String        @default("pcs")
+  moq             Int           @default(500)
+  weight          Float?
+  dimensions      String?
+  material        String?
+  colors          String[]
+  sizes           String[]
+  description     String?       @db.Text
+  shortDesc       String?
+  features        String[]
+  specifications  Json?
+  purchasePrice   Float?
+  sellingPrice    Float?
+  mrp             Float?
+  images          ProductImage[]
+  status          ProductStatus @default(DRAFT)
+  featured        Boolean       @default(false)
+  isCatalogVisible Boolean      @default(true)
+  seoTitle        String?
+  seoDescription  String?
+  tags            String[]
+  views           Int           @default(0)
+  inquiries       Int           @default(0)
+  // Stock
+  stockQty        Float         @default(0)
+  reservedQty     Float         @default(0)
+  reorderLevel    Float         @default(100)
+  // Relations
+  quoteItems      QuoteItem[]
+  orderItems      OrderItem[]
+  purchaseItems   PurchaseItem[]
+  inventoryTxns   InventoryTransaction[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  isPrimary Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@map("product_images")
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ─── PARTY MASTER (Customers, Vendors, etc.) ───────────────────────────────────
+
+model Party {
+  id           String      @id @default(cuid())
+  type         PartyType
+  name         String
+  code         String?     @unique
+  contactPerson String?
+  phone        String?
+  altPhone     String?
+  email        String?
+  website      String?
+  gstin        String?
+  pan          String?
+  // Address
+  address      String?
+  city         String?
+  state        String?
+  pincode      String?
+  country      String      @default("India")
+  // Credit
+  creditLimit  Float?
+  creditDays   Int?
+  // Classification
+  segment      String?
+  industry     String?
+  source       String?
+  tags         String[]
+  notes        String?     @db.Text
+  isActive     Boolean     @default(true)
+  // Relations
+  leads        Lead[]
+  quotes       Quote[]
+  salesOrders  SalesOrder[]
+  invoices     Invoice[]
+  purchases    PurchaseOrder[]
+  contacts     PartyContact[]
+  documents    Document[]
+  activities   Activity[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("parties")
+}
+
+model PartyContact {
+  id        String  @id @default(cuid())
+  partyId   String
+  party     Party   @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?
+  phone     String?
+  email     String?
+  isPrimary Boolean @default(false)
+
+  @@map("party_contacts")
+}
+
+enum PartyType {
+  CUSTOMER
+  VENDOR
+  SUPPLIER
+  DEALER
+  DISTRIBUTOR
+  TRANSPORTER
+}
+
+// ─── CRM ───────────────────────────────────────────────────────────────────────
+
+model Lead {
+  id          String     @id @default(cuid())
+  title       String
+  partyId     String?
+  party       Party?     @relation(fields: [partyId], references: [id])
+  contactName String?
+  phone       String?
+  email       String?
+  company     String?
+  industry    String?
+  source      LeadSource @default(WEBSITE)
+  status      LeadStatus @default(NEW)
+  priority    Priority   @default(MEDIUM)
+  value       Float?
+  notes       String?    @db.Text
+  assignedToId String?
+  assignedTo  User?      @relation(fields: [assignedToId], references: [id])
+  followUpDate DateTime?
+  closedAt    DateTime?
+  lostReason  String?
+  tags        String[]
+  activities  Activity[]
+  tasks       Task[]
+  quotes      Quote[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("leads")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadSource {
+  WEBSITE
+  WHATSAPP
+  REFERRAL
+  GOOGLE
+  INSTAGRAM
+  FACEBOOK
+  COLD_CALL
+  EXHIBITION
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  subject   String
+  notes     String?      @db.Text
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  leadId    String?
+  lead      Lead?        @relation(fields: [leadId], references: [id])
+  partyId   String?
+  party     Party?       @relation(fields: [partyId], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@map("activities")
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  FOLLOW_UP
+  STATUS_CHANGE
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(PENDING)
+  assignedToId String
+  assignedTo  User       @relation(fields: [assignedToId], references: [id])
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id])
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ─── SALES ─────────────────────────────────────────────────────────────────────
+
+model Quote {
+  id            String      @id @default(cuid())
+  number        String      @unique
+  partyId       String
+  party         Party       @relation(fields: [partyId], references: [id])
+  leadId        String?
+  lead          Lead?       @relation(fields: [leadId], references: [id])
+  createdById   String
+  createdBy     User        @relation(fields: [createdById], references: [id])
+  status        QuoteStatus @default(DRAFT)
+  validTill     DateTime
+  items         QuoteItem[]
+  subtotal      Float       @default(0)
+  discount      Float       @default(0)
+  discountType  String      @default("flat") // flat | percent
+  taxAmount     Float       @default(0)
+  total         Float       @default(0)
+  notes         String?     @db.Text
+  terms         String?     @db.Text
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  rejectionNote String?
+  salesOrders   SalesOrder[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id          String  @id @default(cuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  description String?
+  qty         Float
+  unit        String  @default("pcs")
+  unitPrice   Float
+  discount    Float   @default(0)
+  gstRate     Float   @default(18)
+  gstAmount   Float   @default(0)
+  total       Float
+
+  @@map("quote_items")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  APPROVED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model SalesOrder {
+  id            String          @id @default(cuid())
+  number        String          @unique
+  partyId       String
+  party         Party           @relation(fields: [partyId], references: [id])
+  quoteId       String?
+  quote         Quote?          @relation(fields: [quoteId], references: [id])
+  createdById   String
+  createdBy     User            @relation(fields: [createdById], references: [id])
+  status        SalesOrderStatus @default(CONFIRMED)
+  deliveryDate  DateTime?
+  deliveryAddr  String?
+  items         OrderItem[]
+  subtotal      Float
+  taxAmount     Float
+  total         Float
+  notes         String?         @db.Text
+  invoices      Invoice[]
+  dispatches    Dispatch[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@map("sales_orders")
+}
+
+model OrderItem {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+  qty          Float
+  unit         String     @default("pcs")
+  unitPrice    Float
+  gstRate      Float      @default(18)
+  gstAmount    Float
+  total        Float
+  dispatched   Float      @default(0)
+  invoiced     Float      @default(0)
+
+  @@map("order_items")
+}
+
+enum SalesOrderStatus {
+  CONFIRMED
+  PROCESSING
+  READY
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+// ─── INVOICING ──────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  partyId      String
+  party        Party         @relation(fields: [partyId], references: [id])
+  salesOrderId String?
+  salesOrder   SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  type         InvoiceType   @default(TAX_INVOICE)
+  status       InvoiceStatus @default(DRAFT)
+  date         DateTime      @default(now())
+  dueDate      DateTime
+  items        InvoiceItem[]
+  subtotal     Float
+  discount     Float         @default(0)
+  taxAmount    Float
+  total        Float
+  amountPaid   Float         @default(0)
+  balanceDue   Float
+  notes        String?       @db.Text
+  terms        String?       @db.Text
+  payments     Payment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  description String
+  hsn         String?
+  qty         Float
+  unit        String  @default("pcs")
+  unitPrice   Float
+  discount    Float   @default(0)
+  gstRate     Float   @default(18)
+  cgst        Float   @default(0)
+  sgst        Float   @default(0)
+  igst        Float   @default(0)
+  total       Float
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id])
+  amount      Float
+  method      PaymentMethod @default(BANK_TRANSFER)
+  reference   String?
+  date        DateTime      @default(now())
+  notes       String?
+  createdAt   DateTime      @default(now())
+
+  @@map("payments")
+}
+
+enum InvoiceType {
+  PROFORMA
+  TAX_INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  BANK_TRANSFER
+  UPI
+  NEFT
+  RTGS
+  IMPS
+  CARD
+}
+
+// ─── PURCHASE ──────────────────────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  number       String              @unique
+  vendorId     String
+  vendor       Party               @relation(fields: [vendorId], references: [id])
+  status       PurchaseOrderStatus @default(DRAFT)
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  items        PurchaseItem[]
+  subtotal     Float
+  taxAmount    Float
+  total        Float
+  notes        String?             @db.Text
+  grns         GRN[]
+  bills        PurchaseBill[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@map("purchase_orders")
+}
+
+model PurchaseItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  qty             Float
+  unit            String        @default("pcs")
+  unitPrice       Float
+  gstRate         Float         @default(18)
+  gstAmount       Float
+  total           Float
+  received        Float         @default(0)
+
+  @@map("purchase_items")
+}
+
+model GRN {
+  id              String        @id @default(cuid())
+  number          String        @unique
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  receivedDate    DateTime      @default(now())
+  notes           String?
+  items           GRNItem[]
+  createdAt       DateTime      @default(now())
+
+  @@map("grns")
+}
+
+model GRNItem {
+  id          String @id @default(cuid())
+  grnId       String
+  grn         GRN    @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  productId   String
+  qtyReceived Float
+  qtyRejected Float  @default(0)
+  notes       String?
+
+  @@map("grn_items")
+}
+
+model PurchaseBill {
+  id              String              @id @default(cuid())
+  number          String              @unique
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id])
+  vendorBillNo    String?
+  billDate        DateTime
+  dueDate         DateTime
+  subtotal        Float
+  taxAmount       Float
+  total           Float
+  amountPaid      Float               @default(0)
+  status          PurchaseBillStatus  @default(PENDING)
+  notes           String?
+  createdAt       DateTime            @default(now())
+
+  @@map("purchase_bills")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
+enum PurchaseBillStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+// ─── INVENTORY ─────────────────────────────────────────────────────────────────
+
+model Warehouse {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  address     String?
+  city        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("warehouses")
+}
+
+model InventoryTransaction {
+  id          String      @id @default(cuid())
+  type        StockTxType
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id])
+  qty         Float
+  balance     Float
+  warehouseId String?
+  referenceId String?
+  referenceType String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+
+  @@map("inventory_transactions")
+}
+
+enum StockTxType {
+  OPENING
+  PURCHASE_IN
+  SALE_OUT
+  RETURN_IN
+  RETURN_OUT
+  ADJUSTMENT
+  TRANSFER
+  DAMAGE
+}
+
+// ─── LOGISTICS ──────────────────────────────────────────────────────────────────
+
+model Dispatch {
+  id           String         @id @default(cuid())
+  number       String         @unique
+  salesOrderId String
+  salesOrder   SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  status       DispatchStatus @default(READY)
+  dispatchDate DateTime       @default(now())
+  transporter  String?
+  vehicleNo    String?
+  lrNumber     String?
+  deliveryAddr String?
+  items        DispatchItem[]
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("dispatches")
+}
+
+model DispatchItem {
+  id         String   @id @default(cuid())
+  dispatchId String
+  dispatch   Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  productId  String
+  qty        Float
+  unit       String   @default("pcs")
+
+  @@map("dispatch_items")
+}
+
+enum DispatchStatus {
+  READY
+  DISPATCHED
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+// ─── HR & PAYROLL ──────────────────────────────────────────────────────────────
+
+model Department {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  code      String?
+  employees Employee[]
+  createdAt DateTime   @default(now())
+
+  @@map("departments")
+}
+
+model Employee {
+  id           String     @id @default(cuid())
+  empCode      String     @unique
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id])
+  name         String
+  email        String?
+  phone        String?
+  designation  String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  joiningDate  DateTime?
+  salary       Float?
+  bankAccount  String?
+  bankIfsc     String?
+  panNumber    String?
+  pfNumber     String?
+  esiNumber    String?
+  isActive     Boolean    @default(true)
+  attendances  Attendance[]
+  payrolls     Payroll[]
+  leaves       Leave[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("employees")
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  notes      String?
+
+  @@map("attendances")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LEAVE
+  HOLIDAY
+}
+
+model Leave {
+  id         String      @id @default(cuid())
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  type       LeaveType   @default(CASUAL)
+  from       DateTime
+  to         DateTime
+  days       Float
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+  approvedBy String?
+  createdAt  DateTime    @default(now())
+
+  @@map("leaves")
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  EARNED
+  MATERNITY
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Payroll {
+  id          String        @id @default(cuid())
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id])
+  month       Int
+  year        Int
+  basic       Float
+  hra         Float         @default(0)
+  allowances  Float         @default(0)
+  pf          Float         @default(0)
+  esi         Float         @default(0)
+  tds         Float         @default(0)
+  otherDeductions Float     @default(0)
+  gross       Float
+  net         Float
+  status      PayrollStatus @default(DRAFT)
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@map("payrolls")
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSED
+  PAID
+}
+
+// ─── DOCUMENTS ─────────────────────────────────────────────────────────────────
+
+model Document {
+  id          String      @id @default(cuid())
+  name        String
+  type        String
+  url         String
+  size        Int?
+  mimeType    String?
+  partyId     String?
+  party       Party?      @relation(fields: [partyId], references: [id])
+  referenceId String?
+  referenceType String?
+  tags        String[]
+  version     Int         @default(1)
+  notes       String?
+  uploadedBy  String?
+  createdAt   DateTime    @default(now())
+
+  @@map("documents")
+}
+
+// ─── AUDIT LOG ─────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  module     String
+  recordId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
