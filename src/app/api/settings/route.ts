@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
   return ok(settings);
 }
 
+export async function PUT(req: NextRequest) {
+  return PATCH(req);
+}
+
 export async function PATCH(req: NextRequest) {
   const { response } = await requireRole(req, ["ADMIN"]);
   if (response) return response;
@@ -22,8 +26,9 @@ export async function PATCH(req: NextRequest) {
 
   const ALLOWED_KEYS = new Set([
     "name","tagline","address","city","state","pincode","phone","email",
-    "supportEmail","website","gstin","pan","bankName","bankAccount","bankIfsc",
-    "bankBranch","invoicePrefix","financialYear","gstRate",
+    "supportEmail","website","gstin","pan","cin",
+    "bankName","bankAccount","bankIfsc","bankBranch",
+    "invoicePrefix","financialYear","gstRate",
     "currency","currencySymbol","logoUrl",
   ]);
 
