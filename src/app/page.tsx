@@ -1,2 +1,6 @@
 import { redirect } from "next/navigation";
-export default function Home() { redirect("/admin/dashboard"); }
+
+// Root page: always redirect to login (middleware handles session → dashboard)
+export default function Home() {
+  redirect("/login");
+}
