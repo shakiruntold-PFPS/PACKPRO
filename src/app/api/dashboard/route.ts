@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
     topCustomers,
     recentActivities,
     quoteFunnel,
+    followUpsToday,
+    overdueInvoices,
   ] = await Promise.all([
     // Today's invoiced total
     db.invoice.aggregate({
@@ -123,6 +125,21 @@ export async function GET(req: NextRequest) {
       _count: true,
       _sum: { total: true },
     }).catch(() => []),
+
+    // Follow-ups due today or overdue
+    db.lead.count({
+      where: {
+        followUpDate: { lte: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) },
+        status: { notIn: ["WON", "LOST"] },
+      },
+    }).catch(() => 0),
+
+    // Overdue invoices
+    db.invoice.aggregate({
+      where: { status: "OVERDUE" },
+      _count: true,
+      _sum: { balanceDue: true },
+    }).catch(() => ({ _count: 0, _sum: { balanceDue: 0 } })),
   ]);
 
   // Calculate low stock count from fetched products
@@ -174,6 +191,9 @@ export async function GET(req: NextRequest) {
       totalProducts,
       totalEmployees,
       pendingDispatches,
+      followUpsToday,
+      overdueInvoiceCount: (overdueInvoices as any)._count ?? 0,
+      overdueAmount: (overdueInvoices as any)._sum?.balanceDue ?? 0,
     },
     monthlyTrend,
     topProducts,

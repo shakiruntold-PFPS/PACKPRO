@@ -61,6 +61,7 @@ const NAV = [
   {
     group: "Admin",
     items: [
+      { href: "/admin/users", icon: UserSquare, label: "User Management" },
       { href: "/admin/settings", icon: Settings, label: "Settings" },
     ],
   },
