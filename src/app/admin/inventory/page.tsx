@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { AlertTriangle, ArrowUp, Search, RefreshCw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 
 function StockBadge({ qty, reorder }: { qty: number; reorder: number }) {
   if (qty === 0) return <span className="badge badge-red">Out of Stock</span>;
@@ -20,7 +21,7 @@ export default function InventoryPage() {
   const [adjType, setAdjType] = useState("ADJUSTMENT");
   const [adjNotes, setAdjNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState("");
+  const { success, error } = useToast();
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -54,17 +55,20 @@ export default function InventoryPage() {
       const qty = parseFloat(adjQty);
       const isOut = ["SALE_OUT","DAMAGE"].includes(adjType);
       const change = isOut ? -Math.abs(qty) : Math.abs(qty);
-      await fetch("/api/inventory", {
+      const res = await fetch("/api/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: adjModal.id, type: adjType, quantity: change, notes: adjNotes }),
+        body: JSON.stringify({ productId: adjModal.id, type: adjType, qty: change, notes: adjNotes }),
       });
-      setToast("Stock updated");
-      setTimeout(() => setToast(""), 3000);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      success("Stock updated", `${adjModal.name}: ${adjType}`);
       setAdjModal(null);
       setAdjQty("");
       setAdjNotes("");
       fetchProducts();
+    } catch (err_: any) {
+      error("Stock adjustment failed", err_.message);
     } finally {
       setSaving(false);
     }
@@ -82,10 +86,7 @@ export default function InventoryPage() {
         </button>
       </div>
 
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-semibold"
-          style={{ background:"#10b981", color:"#fff" }}>{toast}</div>
-      )}
+
 
       {lowStockItems.length > 0 && (
         <div className="flex items-center gap-3 p-4 rounded-xl mb-5"
