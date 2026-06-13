@@ -7,6 +7,7 @@ import { sanitizeObject } from "@/lib/sanitize";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { calculateLeadScore } from "@/lib/scoring";
+import { triggerAutomation } from "@/lib/automation";
 
 const LeadSchema = z.object({
   title:        z.string().min(1).max(300),
@@ -125,5 +126,12 @@ export async function POST(req: NextRequest) {
     title: lead.title,
     status: lead.status,
   });
+
+  triggerAutomation("LEAD_CREATED", {
+    leadId: lead.id,
+    userId: user!.id,
+    lead: { id: lead.id, title: lead.title, value: lead.value, source: lead.source },
+  }).catch(() => null);
+
   return created(lead);
 }

@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const startOfMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear   = new Date(now.getFullYear(), 3, 1); // April (Indian FY)
   const startOfToday  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
   const [
     todaySales,
@@ -34,6 +36,15 @@ export async function GET(req: NextRequest) {
     quoteFunnel,
     followUpsToday,
     overdueInvoices,
+    // NEW queries
+    openTasksCount,
+    pendingFollowUpsCount,
+    teamPerformanceRaw,
+    customerRisksRaw,
+    upcomingFollowUps,
+    pendingApprovals,
+    recentOrders,
+    dispatchStatusRaw,
   ] = await Promise.all([
     // Today's invoiced total
     db.invoice.aggregate({
@@ -77,7 +88,6 @@ export async function GET(req: NextRequest) {
     }).catch(() => ({ _sum: { total: 0 } })),
 
     // Low stock: products where stockQty <= reorderLevel
-    // Use findMany + filter to avoid the invalid db.product.fields.reorderLevel pattern
     db.product.findMany({
       where: { status: "PUBLISHED" },
       select: { id: true, stockQty: true, reorderLevel: true },
@@ -140,6 +150,76 @@ export async function GET(req: NextRequest) {
       _count: true,
       _sum: { balanceDue: true },
     }).catch(() => ({ _count: 0, _sum: { balanceDue: 0 } })),
+
+    // NEW: Open tasks (PENDING or IN_PROGRESS)
+    db.task.count({
+      where: { status: { in: ["PENDING", "IN_PROGRESS"] } },
+    }).catch(() => 0),
+
+    // NEW: Pending follow-ups (followUpDate <= today, not WON/LOST)
+    db.lead.count({
+      where: {
+        followUpDate: { lte: now },
+        status: { notIn: ["WON", "LOST"] },
+      },
+    }).catch(() => 0),
+
+    // NEW: Team performance — quotes per user in last 30 days
+    db.quote.groupBy({
+      by: ["createdById"],
+      _count: true,
+      where: { createdAt: { gte: thirtyDaysAgo } },
+      orderBy: { _count: { createdById: "desc" } },
+    }).catch(() => []),
+
+    // NEW: Customer risks — overdue invoices grouped by party
+    db.invoice.groupBy({
+      by: ["partyId"],
+      _count: true,
+      _sum: { balanceDue: true },
+      where: { status: "OVERDUE" },
+      orderBy: { _sum: { balanceDue: "desc" } },
+      take: 10,
+    }).catch(() => []),
+
+    // NEW: Upcoming follow-ups (next 3 days)
+    db.lead.findMany({
+      where: {
+        followUpDate: { gte: now, lte: threeDaysFromNow },
+        status: { notIn: ["WON", "LOST"] },
+      },
+      select: { id: true, title: true, contactName: true, followUpDate: true, priority: true },
+      orderBy: { followUpDate: "asc" },
+      take: 10,
+    }).catch(() => []),
+
+    // NEW: Pending approvals — quotes with status=SENT
+    db.quote.findMany({
+      where: { status: "SENT" },
+      select: {
+        id: true, number: true, total: true, createdAt: true,
+        party: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }).catch(() => []),
+
+    // NEW: Recent orders (last 5 CONFIRMED/PROCESSING)
+    db.salesOrder.findMany({
+      where: { status: { in: ["CONFIRMED", "PROCESSING"] } },
+      select: {
+        id: true, number: true, total: true, status: true,
+        party: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }).catch(() => []),
+
+    // NEW: Dispatch status grouped
+    db.dispatch.groupBy({
+      by: ["status"],
+      _count: true,
+    }).catch(() => []),
   ]);
 
   // Calculate low stock count from fetched products
@@ -175,6 +255,49 @@ export async function GET(req: NextRequest) {
     invoices: (monthlyTrendRaw[i] as any)._count ?? 0,
   }));
 
+  // Revenue target projection
+  const daysElapsed = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const actualMonthRevenue = (monthSales as any)._sum?.total ?? 0;
+  const projectedMonthRevenue = daysElapsed > 0
+    ? Math.round((actualMonthRevenue / daysElapsed) * daysInMonth)
+    : 0;
+
+  // Enrich team performance with user names
+  const teamPerformanceEnriched = await Promise.all(
+    (teamPerformanceRaw as any[]).map(async (row: any) => {
+      const u = await db.user.findUnique({
+        where: { id: row.createdById },
+        select: { name: true },
+      }).catch(() => null);
+      return { userId: row.createdById, name: u?.name ?? "Unknown", quotesCount: row._count };
+    })
+  );
+
+  // Enrich customer risks with party names
+  const customerRisksEnriched = await Promise.all(
+    (customerRisksRaw as any[]).map(async (row: any) => {
+      const p = await db.party.findUnique({
+        where: { id: row.partyId },
+        select: { name: true },
+      }).catch(() => null);
+      return {
+        partyId: row.partyId,
+        partyName: p?.name ?? "Unknown",
+        overdueCount: row._count,
+        totalOverdue: row._sum?.balanceDue ?? 0,
+      };
+    })
+  );
+
+  // Dispatch status map
+  const dispatchStatus: Record<string, number> = {
+    READY: 0, DISPATCHED: 0, IN_TRANSIT: 0, DELIVERED: 0,
+  };
+  (dispatchStatusRaw as any[]).forEach((row: any) => {
+    dispatchStatus[row.status] = row._count ?? 0;
+  });
+
   return ok({
     kpis: {
       todayRevenue:             (todaySales as any)._sum?.total ?? 0,
@@ -194,11 +317,26 @@ export async function GET(req: NextRequest) {
       followUpsToday,
       overdueInvoiceCount: (overdueInvoices as any)._count ?? 0,
       overdueAmount: (overdueInvoices as any)._sum?.balanceDue ?? 0,
+      openTasks: openTasksCount,
+      pendingFollowUps: pendingFollowUpsCount,
     },
     monthlyTrend,
     topProducts,
     topCustomers,
     recentActivities,
     quoteFunnel,
+    // NEW
+    upcomingFollowUps,
+    pendingApprovals,
+    recentOrders,
+    dispatchStatus,
+    customerRisks: customerRisksEnriched,
+    teamPerformance: teamPerformanceEnriched,
+    revenueTarget: {
+      projected: projectedMonthRevenue,
+      actual: actualMonthRevenue,
+      daysElapsed,
+      daysInMonth,
+    },
   });
 }

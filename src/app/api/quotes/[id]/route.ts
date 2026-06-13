@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { ok, err, requireAuth, logAction } from "@/lib/api";
+import { triggerAutomation } from "@/lib/automation";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -37,6 +38,15 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   }
   const updated = await db.quote.update({ where: { id }, data });
   await logAction(user!.id, "UPDATE", "QUOTE", id, { status: old.status }, { status: data.status });
+
+  if (body.status === "SENT" && old.status !== "SENT") {
+    triggerAutomation("QUOTE_SENT", {
+      quoteId: id,
+      userId: user!.id,
+      quote: { id, number: old.number, partyId: old.partyId, total: old.total },
+    }).catch(() => null);
+  }
+
   return ok(updated);
 }
 
