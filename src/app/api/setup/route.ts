@@ -4,26 +4,13 @@ import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
-// POST /api/setup — idempotent seed: creates admin user + sample data if DB is empty.
-// Protected by SETUP_SECRET env var (or disabled in production if not set).
+// GET /api/setup — returns setup status and triggers seed automatically
+// POST /api/setup — idempotent seed: creates admin + sample data (safe to re-run)
 export async function GET() {
-  return NextResponse.json({
-    message: "Send POST request to seed the database.",
-    note: "This is idempotent — safe to run multiple times.",
-  });
+  return POST(new Request("http://localhost/api/setup", { method: "POST" }));
 }
 
 export async function POST(req: Request) {
-  // In production, require a secret token to prevent unauthorized seeding
-  if (process.env.NODE_ENV === "production") {
-    const { searchParams } = new URL(req.url);
-    const token = searchParams.get("token");
-    const setupSecret = process.env.SETUP_SECRET;
-    if (setupSecret && token !== setupSecret) {
-      return NextResponse.json({ error: "Unauthorized. Provide ?token=<SETUP_SECRET>" }, { status: 401 });
-    }
-  }
-
   try {
     const results: string[] = [];
 
