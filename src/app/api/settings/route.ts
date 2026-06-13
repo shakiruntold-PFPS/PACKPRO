@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { ok, err, requireAuth } from "@/lib/api";
+import { ok, err, requireAuth, requireRole } from "@/lib/api";
+import { sanitizeObject } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 
@@ -14,29 +15,31 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { user, response } = await requireAuth(req);
+  const { response } = await requireRole(req, ["ADMIN"]);
   if (response) return response;
 
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
 
-  const allowed = [
+  const ALLOWED_KEYS = new Set([
     "name","tagline","address","city","state","pincode","phone","email",
-    "supportEmail","website","gstin","pan","bankName","accountNo","ifsc",
-    "branch","accountType","upiId","invoicePrefix","financialYear","gstRate",
-    "currency","currencySymbol","defaultDuedays","notes","logo",
-  ];
+    "supportEmail","website","gstin","pan","bankName","bankAccount","bankIfsc",
+    "bankBranch","invoicePrefix","financialYear","gstRate",
+    "currency","currencySymbol","logoUrl",
+  ]);
 
-  const update: Record<string, any> = {};
-  for (const key of allowed) {
-    if (key in body) update[key] = body[key];
+  const update: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(body)) {
+    if (ALLOWED_KEYS.has(key)) update[key] = val;
   }
 
   if (Object.keys(update).length === 0) return err("No valid fields to update");
 
+  const sanitized = sanitizeObject(update as Record<string, unknown>);
+
   const settings = await db.companySettings.upsert({
     where: { id: "default" },
-    update,
-    create: { id: "default", name: "PACKPRO", ...update },
+    update: sanitized,
+    create: { id: "default", name: "PACKPRO", ...sanitized },
   });
 
   return ok(settings);

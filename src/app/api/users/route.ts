@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { ok, err, requireAuth, paginate, paginatedResponse } from "@/lib/api";
+import { ok, err, requireAuth, requireRole, paginate, paginatedResponse } from "@/lib/api";
 import { sanitizeText } from "@/lib/sanitize";
 import { Prisma, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const { response } = await requireAuth(req);
+  const { response } = await requireRole(req, ["ADMIN", "MANAGER", "HR"]);
   if (response) return response;
 
   const sp = req.nextUrl.searchParams;
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { response } = await requireAuth(req);
+  const { response } = await requireRole(req, ["ADMIN"]);
   if (response) return response;
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;

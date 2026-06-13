@@ -6,8 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon requires a direct (non-pooled) connection for Prisma migrations.
+  // Leave DIRECT_URL unset in development (only DATABASE_URL is used then).
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── AUTH & USERS ─────────────────────────────────────────────────────────────
@@ -156,6 +159,7 @@ model Product {
 
   @@index([deletedAt])
   @@index([status, categoryId])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
 }
 
@@ -222,6 +226,7 @@ model Party {
 
   @@index([deletedAt])
   @@index([type, isActive])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("parties")
 }
 
@@ -279,6 +284,7 @@ model Lead {
 
   @@index([deletedAt])
   @@index([status, assignedToId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("leads")
 }
 
