@@ -47,23 +47,117 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   if (!body.vendorId) return err("vendorId is required");
 
+  // ── Normalise items ────────────────────────────────────────────────────────
+  type ItemInput = {
+    productId: string;
+    qty: number;
+    unit?: string;
+    unitPrice: number;
+    discount?: number;
+    gstRate?: number;
+  };
+
+  const rawItems: ItemInput[] = Array.isArray(body.items) ? body.items : [];
+
+  if (rawItems.length === 0 && !body.subtotal) {
+    // Allow header-only creation (backward compat) but items are preferred
+  }
+
+  type ComputedItem = {
+    productId: string;
+    qty: number;
+    unit: string;
+    unitPrice: number;
+    gstRate: number;
+    gstAmount: number;
+    total: number;
+  };
+
+  const computedItems: ComputedItem[] = rawItems.map((i) => {
+    const qty       = i.qty;
+    const unitPrice = i.unitPrice;
+    const discount  = i.discount ?? 0;
+    const gstRate   = i.gstRate ?? 18;
+    const taxable   = qty * unitPrice - discount;
+    const gstAmount = taxable * gstRate / 100;
+    const total     = taxable + gstAmount;
+    return {
+      productId: i.productId,
+      qty,
+      unit:      i.unit ?? "pcs",
+      unitPrice,
+      gstRate,
+      gstAmount,
+      total,
+    };
+  });
+
+  // ── Derive PO totals from items (or fall back to body fields) ─────────────
+  const derivedSubtotal = computedItems.length
+    ? computedItems.reduce((s, i) => s + i.qty * i.unitPrice, 0)
+    : (body.subtotal ?? 0);
+  const derivedTax = computedItems.length
+    ? computedItems.reduce((s, i) => s + i.gstAmount, 0)
+    : (body.taxAmount ?? 0);
+  const derivedTotal = computedItems.length
+    ? computedItems.reduce((s, i) => s + i.total, 0)
+    : (body.total ?? 0);
+
+  // ── Generate PO number ─────────────────────────────────────────────────────
   const yr     = new Date().getFullYear().toString().slice(-2);
   const mo     = String(new Date().getMonth() + 1).padStart(2, "0");
   const cnt    = await db.purchaseOrder.count();
   const number = `PO-${yr}${mo}-${String(cnt + 1).padStart(3, "0")}`;
 
+  const status: string = body.status ?? "DRAFT";
+
+  // ── Create PO with nested items ────────────────────────────────────────────
   const po = await db.purchaseOrder.create({
     data: {
       number,
       vendorId:     body.vendorId,
-      status:       body.status ?? "DRAFT",
+      status,
       expectedDate: body.expectedDate ? new Date(body.expectedDate) : undefined,
-      subtotal:     body.subtotal ?? 0,
-      taxAmount:    body.taxAmount ?? 0,
-      total:        body.total ?? 0,
+      subtotal:     derivedSubtotal,
+      taxAmount:    derivedTax,
+      total:        derivedTotal,
       notes:        body.notes,
+      ...(computedItems.length > 0
+        ? {
+            items: {
+              create: computedItems,
+            },
+          }
+        : {}),
     },
+    include: { items: true, vendor: true },
   });
+
+  // ── If status is RECEIVED on creation, trigger inventory update ────────────
+  if (status === "RECEIVED" && po.items.length > 0) {
+    await db.$transaction(async (tx) => {
+      for (const item of po.items) {
+        const prod = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!prod) continue;
+        const newStock = (prod.stockQty ?? 0) + item.qty;
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQty: newStock },
+        });
+        await tx.inventoryTransaction.create({
+          data: {
+            type: "PURCHASE_IN",
+            productId: item.productId,
+            qty: item.qty,
+            balance: newStock,
+            referenceId: po.id,
+            referenceType: "PURCHASE_ORDER",
+            notes: `Received from PO ${po.number}`,
+          },
+        });
+      }
+    });
+  }
 
   await logAction(user!.id, "CREATE", "PURCHASE_ORDER", po.id, null, po);
   return ok(po, 201);
