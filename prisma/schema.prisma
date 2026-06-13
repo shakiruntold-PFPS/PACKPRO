@@ -6,8 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon requires a direct (non-pooled) connection for Prisma migrations.
+  // Leave DIRECT_URL unset in development (only DATABASE_URL is used then).
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── AUTH & USERS ─────────────────────────────────────────────────────────────
@@ -145,6 +148,7 @@ model Product {
   stockQty        Float         @default(0)
   reservedQty     Float         @default(0)
   reorderLevel    Float         @default(100)
+  deletedAt       DateTime?
   // Relations
   quoteItems      QuoteItem[]
   orderItems      OrderItem[]
@@ -153,6 +157,9 @@ model Product {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  @@index([deletedAt])
+  @@index([status, categoryId])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
 }
 
@@ -204,6 +211,7 @@ model Party {
   tags         String[]
   notes        String?     @db.Text
   isActive     Boolean     @default(true)
+  deletedAt    DateTime?
   // Relations
   leads        Lead[]
   quotes       Quote[]
@@ -216,6 +224,9 @@ model Party {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
+  @@index([deletedAt])
+  @@index([type, isActive])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("parties")
 }
 
@@ -264,12 +275,16 @@ model Lead {
   closedAt    DateTime?
   lostReason  String?
   tags        String[]
+  deletedAt   DateTime?
   activities  Activity[]
   tasks       Task[]
   quotes      Quote[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  @@index([deletedAt])
+  @@index([status, assignedToId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("leads")
 }
 
@@ -378,10 +393,13 @@ model Quote {
   approvedAt    DateTime?
   rejectedAt    DateTime?
   rejectionNote String?
+  deletedAt     DateTime?
   salesOrders   SalesOrder[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  @@index([deletedAt])
+  @@index([status, partyId])
   @@map("quotes")
 }
 
@@ -430,11 +448,14 @@ model SalesOrder {
   taxAmount     Float
   total         Float
   notes         String?         @db.Text
+  deletedAt     DateTime?
   invoices      Invoice[]
   dispatches    Dispatch[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  @@index([deletedAt])
+  @@index([status, partyId])
   @@map("sales_orders")
 }
 
@@ -487,10 +508,14 @@ model Invoice {
   balanceDue   Float
   notes        String?       @db.Text
   terms        String?       @db.Text
+  deletedAt    DateTime?
   payments     Payment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  @@index([deletedAt])
+  @@index([status, partyId])
+  @@index([dueDate, status])
   @@map("invoices")
 }
 
@@ -571,11 +596,13 @@ model PurchaseOrder {
   taxAmount    Float
   total        Float
   notes        String?             @db.Text
+  deletedAt    DateTime?
   grns         GRN[]
   bills        PurchaseBill[]
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
+  @@index([deletedAt])
   @@map("purchase_orders")
 }
 
@@ -787,6 +814,7 @@ model Attendance {
   status     AttendanceStatus @default(PRESENT)
   notes      String?
 
+  @@unique([employeeId, date])
   @@map("attendances")
 }
 
@@ -893,5 +921,21 @@ model AuditLog {
   userAgent  String?
   createdAt  DateTime @default(now())
 
+  @@index([userId, createdAt])
+  @@index([module, createdAt])
+  @@index([recordId])
   @@map("audit_logs")
+}
+
+// ─── SCHEMA VERSION ────────────────────────────────────────────────────────────
+// Tracks the current data schema version. Used by the migration runner to
+// detect and apply structural changes on startup without Prisma migrate.
+
+model SchemaVersion {
+  id          Int      @id @default(1)
+  version     Int      @default(1)
+  appliedAt   DateTime @default(now())
+  description String?
+
+  @@map("schema_versions")
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
   TrendingUp, TrendingDown, Users, Package, FileText,
@@ -7,15 +7,25 @@ import {
   Truck, DollarSign, Activity,
 } from "lucide-react";
 
-const AreaChart = dynamic(() => import("recharts").then(m => m.AreaChart), { ssr: false });
-const Area = dynamic(() => import("recharts").then(m => m.Area), { ssr: false });
-const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
-const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
-const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
-const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
+// Recharts ships with incompatible defaultProps types that clash with Next.js 15
+// dynamic() generic constraints. Cast each component to silence these structural
+// mismatches — they are safe at runtime. Do NOT use `any` for actual prop types.
+// Recharts components have `defaultProps` typed with string literals that conflict
+// with Next.js dynamic() constraints at the structural type level. The double cast
+// (component → unknown → ComponentType<any>) is intentional and safe at runtime.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RC = React.ComponentType<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const c = (v: unknown) => v as RC;
+const AreaChart           = dynamic(() => import("recharts").then(m => ({ default: c(m.AreaChart)           })), { ssr: false });
+const Area                = dynamic(() => import("recharts").then(m => ({ default: c(m.Area)                })), { ssr: false });
+const BarChart            = dynamic(() => import("recharts").then(m => ({ default: c(m.BarChart)            })), { ssr: false });
+const Bar                 = dynamic(() => import("recharts").then(m => ({ default: c(m.Bar)                 })), { ssr: false });
+const XAxis               = dynamic(() => import("recharts").then(m => ({ default: c(m.XAxis)               })), { ssr: false });
+const YAxis               = dynamic(() => import("recharts").then(m => ({ default: c(m.YAxis)               })), { ssr: false });
+const CartesianGrid       = dynamic(() => import("recharts").then(m => ({ default: c(m.CartesianGrid)       })), { ssr: false });
+const Tooltip             = dynamic(() => import("recharts").then(m => ({ default: c(m.Tooltip)             })), { ssr: false });
+const ResponsiveContainer = dynamic(() => import("recharts").then(m => ({ default: c(m.ResponsiveContainer) })), { ssr: false });
 
 function fmt(n: number) {
   if (n >= 1e7) return `₹${(n / 1e7).toFixed(1)}Cr`;
