@@ -8,6 +8,7 @@ import {
   Receipt, Truck, Warehouse, UserSquare, Settings, LogOut,
   ChevronLeft, ChevronRight, Bell, Search, Building2,
   ClipboardList, FolderOpen, X, Menu, Command, ChevronDown,
+  Globe, BookOpen,
 } from "lucide-react";
 
 const NAV = [
@@ -38,7 +39,15 @@ const NAV = [
     group: "Catalog",
     items: [
       { href: "/admin/products", icon: Package, label: "Products" },
+      { href: "/admin/catalog", icon: BookOpen, label: "Catalog Manager" },
       { href: "/admin/parties", icon: Building2, label: "Parties" },
+    ],
+  },
+  {
+    group: "Website",
+    items: [
+      { href: "/admin/website", icon: Globe, label: "Website & Settings" },
+      { href: "/admin/documents", icon: FolderOpen, label: "Documents" },
     ],
   },
   {
@@ -52,7 +61,6 @@ const NAV = [
   {
     group: "Admin",
     items: [
-      { href: "/admin/documents", icon: FolderOpen, label: "Documents" },
       { href: "/admin/settings", icon: Settings, label: "Settings" },
     ],
   },
