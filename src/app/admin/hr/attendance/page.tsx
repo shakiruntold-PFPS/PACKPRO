@@ -1,91 +1,201 @@
 "use client";
-import { useState } from "react";
-import { Calendar, CheckCircle, XCircle, Clock } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Save } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { CardSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 
-const EMPLOYEES = [
-  { id:"1", empCode:"PP-001", name:"Rahul Sharma", department:"Sales" },
-  { id:"2", empCode:"PP-002", name:"Priya Verma", department:"Accounts" },
-  { id:"3", empCode:"PP-003", name:"Amit Singh", department:"Operations" },
-  { id:"4", empCode:"PP-004", name:"Sneha Gupta", department:"Sales" },
-];
+const STATUS_OPTS = ["PRESENT","ABSENT","HALF_DAY","LEAVE","HOLIDAY"] as const;
+type AttStatus = typeof STATUS_OPTS[number];
 
-const MOCK_ATTENDANCE: Record<string,string> = {
-  "PP-001":"PRESENT","PP-002":"PRESENT","PP-003":"ABSENT","PP-004":"HALF_DAY"
-};
-
-const STATUS_STYLE: Record<string,{badge:string,icon:any,label:string}> = {
-  PRESENT:  { badge:"badge-green",  icon:CheckCircle, label:"Present" },
-  ABSENT:   { badge:"badge-red",    icon:XCircle,     label:"Absent"  },
-  HALF_DAY: { badge:"badge-amber",  icon:Clock,       label:"Half Day" },
-  LEAVE:    { badge:"badge-blue",   icon:Calendar,    label:"Leave"   },
-  HOLIDAY:  { badge:"badge-purple", icon:Calendar,    label:"Holiday" },
+const STATUS_META: Record<AttStatus, { badge: string; icon: any; label: string; short: string }> = {
+  PRESENT:  { badge:"badge-green",  icon:CheckCircle, label:"Present",  short:"P"  },
+  ABSENT:   { badge:"badge-red",    icon:XCircle,     label:"Absent",   short:"A"  },
+  HALF_DAY: { badge:"badge-amber",  icon:Clock,       label:"Half Day", short:"½"  },
+  LEAVE:    { badge:"badge-blue",   icon:Calendar,    label:"Leave",    short:"L"  },
+  HOLIDAY:  { badge:"badge-purple", icon:Calendar,    label:"Holiday",  short:"H"  },
 };
 
 export default function AttendancePage() {
-  const today = new Date().toISOString().slice(0,10);
-  const [date, setDate] = useState(today);
-  const [att, setAtt] = useState<Record<string,string>>(MOCK_ATTENDANCE);
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate]         = useState(today);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, AttStatus>>({});
+  const [loading, setLoading]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const { success, error } = useToast();
 
-  const present = Object.values(att).filter(s=>s==="PRESENT").length;
-  const absent = Object.values(att).filter(s=>s==="ABSENT").length;
+  const fetchAttendance = useCallback(async () => {
+    setLoading(true);
+    setOverrides({});
+    try {
+      const res  = await fetch(`/api/attendance?date=${date}`);
+      const json = await res.json();
+      setEmployees(json.data ?? []);
+    } catch {
+      error("Failed to load attendance");
+    } finally {
+      setLoading(false);
+    }
+  }, [date, error]);
+
+  useEffect(() => { fetchAttendance(); }, [fetchAttendance]);
+
+  function getStatus(emp: any): AttStatus {
+    if (overrides[emp.id]) return overrides[emp.id];
+    return (emp.attendances?.[0]?.status as AttStatus) ?? "ABSENT";
+  }
+
+  function markAll(status: AttStatus) {
+    const updates: Record<string, AttStatus> = {};
+    employees.forEach(e => { updates[e.id] = status; });
+    setOverrides(updates);
+  }
+
+  async function saveAttendance() {
+    setSaving(true);
+    try {
+      const records = employees.map(emp => ({
+        employeeId: emp.id,
+        date,
+        status: getStatus(emp),
+      }));
+      const res = await fetch("/api/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records }),
+      });
+      if (!res.ok) throw new Error();
+      success("Attendance saved", `${records.length} records saved for ${date}`);
+      setOverrides({});
+      fetchAttendance();
+    } catch {
+      error("Failed to save attendance");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const stats = {
+    present:  employees.filter(e => getStatus(e) === "PRESENT").length,
+    absent:   employees.filter(e => getStatus(e) === "ABSENT").length,
+    halfDay:  employees.filter(e => getStatus(e) === "HALF_DAY").length,
+    leave:    employees.filter(e => getStatus(e) === "LEAVE").length,
+    holiday:  employees.filter(e => getStatus(e) === "HOLIDAY").length,
+  };
+
+  const isDirty = Object.keys(overrides).length > 0;
 
   return (
-    <div className="module-page">
+    <div className="module-page animate-in">
       <div className="module-header">
         <div>
           <h1 className="module-title">Attendance</h1>
-          <p className="module-subtitle">Present: {present} · Absent: {absent} · {EMPLOYEES.length} total</p>
+          <p className="module-subtitle">
+            {employees.length} employees · Present: {stats.present} · Absent: {stats.absent}
+          </p>
         </div>
-        <input type="date" value={date} onChange={e=>setDate(e.target.value)}
-          className="erp-input" style={{ width:"auto", background:"#0b1e3d" }}/>
+        <div className="flex gap-2 flex-wrap">
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="erp-input" style={{ width: "auto" }} />
+          <button className="btn-ghost" onClick={fetchAttendance}>
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+          </button>
+          {isDirty && (
+            <button className="btn-primary" onClick={saveAttendance} disabled={saving}>
+              {saving
+                ? <span className="inline-flex items-center gap-2"><span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />Saving…</span>
+                : <><Save size={13} /> Save</>}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label:"Present", value:present, color:"#10b981" },
-          { label:"Absent",  value:absent,  color:"#ef4444" },
-          { label:"Half Day",value:Object.values(att).filter(s=>s==="HALF_DAY").length, color:"#f59e0b" },
-          { label:"On Leave", value:Object.values(att).filter(s=>s==="LEAVE").length, color:"#60a5fa" },
-        ].map(s=>(
-          <div key={s.label} className="kpi-card">
-            <div className="text-xs font-semibold uppercase mb-2" style={{ color:"var(--muted)" }}>{s.label}</div>
-            <div className="text-2xl font-black" style={{ color:s.color }}>{s.value}</div>
-          </div>
+      {/* KPI row */}
+      {loading ? <CardSkeleton count={5} /> : (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          {[
+            { label: "Present",  value: stats.present,  color: "#10b981" },
+            { label: "Absent",   value: stats.absent,   color: "#ef4444" },
+            { label: "Half Day", value: stats.halfDay,  color: "#f59e0b" },
+            { label: "On Leave", value: stats.leave,    color: "#60a5fa" },
+            { label: "Holiday",  value: stats.holiday,  color: "#a78bfa" },
+          ].map(s => (
+            <div key={s.label} className="kpi-card text-center py-4">
+              <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-xs font-semibold mt-1" style={{ color: "var(--muted)" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Quick mark all */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Mark All:</span>
+        {STATUS_OPTS.filter(s => s !== "HOLIDAY").map(s => (
+          <button key={s} onClick={() => markAll(s)}
+            className="btn-ghost" style={{ padding: "5px 12px", fontSize: "11px" }}>
+            {STATUS_META[s].label}
+          </button>
         ))}
       </div>
 
-      <div className="glass rounded-2xl overflow-auto">
-        <table className="erp-table">
-          <thead>
-            <tr>{["Employee","Code","Department","Status","Mark As"].map(h=><th key={h}>{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {EMPLOYEES.map(emp=>{
-              const status = att[emp.empCode]||"ABSENT";
-              const s = STATUS_STYLE[status];
-              return (
-                <tr key={emp.id}>
-                  <td className="font-semibold text-white">{emp.name}</td>
-                  <td className="font-mono text-xs" style={{ color:"#14c7c0" }}>{emp.empCode}</td>
-                  <td style={{ color:"var(--muted)" }}>{emp.department}</td>
-                  <td><span className={`badge ${s.badge}`}>{s.label}</span></td>
-                  <td>
-                    <div className="flex gap-1">
-                      {["PRESENT","ABSENT","HALF_DAY","LEAVE"].map(v=>(
-                        <button key={v} onClick={()=>setAtt(a=>({...a,[emp.empCode]:v}))}
-                          className={att[emp.empCode]===v?"btn-primary":"btn-ghost"}
-                          style={{ padding:"4px 10px", fontSize:"11px" }}>
-                          {v==="HALF_DAY"?"½":v[0]}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Table */}
+      {loading ? <TableSkeleton rows={6} cols={5} /> : (
+        <div className="glass rounded-2xl overflow-auto">
+          <table className="erp-table">
+            <thead>
+              <tr>
+                {["Employee", "Code", "Department", "Status", "Mark As"].map(h => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {employees.length === 0 && (
+                <tr><td colSpan={5}>
+                  <div className="empty-state">
+                    <Calendar size={36} />
+                    <div className="text-sm font-semibold mt-2">No employees found</div>
+                    <div className="text-xs mt-1">Add employees in the HR module first</div>
+                  </div>
+                </td></tr>
+              )}
+              {employees.map(emp => {
+                const status = getStatus(emp);
+                const meta   = STATUS_META[status];
+                const changed = !!overrides[emp.id];
+                return (
+                  <tr key={emp.id} style={changed ? { background: "rgba(14,165,160,0.05)" } : {}}>
+                    <td>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{ background: "linear-gradient(135deg,#0ea5a0,#1b4f8a)", color: "#fff" }}>
+                          {emp.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                        </div>
+                        <span className="font-semibold text-white text-sm">{emp.name}</span>
+                      </div>
+                    </td>
+                    <td><span className="font-mono text-xs" style={{ color: "#14c7c0" }}>{emp.empCode}</span></td>
+                    <td style={{ color: "var(--muted)", fontSize: 13 }}>{emp.department?.name ?? "—"}</td>
+                    <td><span className={`badge ${meta.badge}`}>{meta.label}</span></td>
+                    <td>
+                      <div className="flex gap-1">
+                        {STATUS_OPTS.filter(s => s !== "HOLIDAY").map(v => (
+                          <button key={v}
+                            onClick={() => setOverrides(o => ({ ...o, [emp.id]: v }))}
+                            className={status === v ? "btn-primary" : "btn-ghost"}
+                            style={{ padding: "4px 10px", fontSize: "11px" }}
+                            title={STATUS_META[v].label}>
+                            {STATUS_META[v].short}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -200,13 +200,37 @@ textarea { font-family:inherit; }
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 
 /* ─── Animations ──────────────────────────────────────────────────────────── */
-@keyframes fadeIn  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-@keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:none; } }
-@keyframes spin    { to { transform:rotate(360deg); } }
-@keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+@keyframes fadeIn       { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes slideIn      { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:none; } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+@keyframes spin         { to { transform:rotate(360deg); } }
+@keyframes pulse        { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+@keyframes shimmer      { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+@keyframes scaleIn      { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:none; } }
 
-.animate-in   { animation:fadeIn .2s ease; }
-.animate-spin { animation:spin 1s linear infinite; }
+.animate-in       { animation:fadeIn .2s ease; }
+.animate-in-scale { animation:scaleIn .2s ease; }
+.animate-spin     { animation:spin 1s linear infinite; }
+
+/* ─── Modal ──────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position:fixed; inset:0; z-index:150;
+  background:rgba(0,0,0,.65); backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center; padding:16px;
+  animation:fadeIn .15s ease;
+}
+.modal-box {
+  background:rgba(14,28,58,0.99); border:1px solid rgba(255,255,255,0.1);
+  border-radius:18px; padding:28px;
+  width:100%; max-width:560px; max-height:90vh; overflow-y:auto;
+  animation:scaleIn .2s ease;
+  box-shadow:0 24px 80px rgba(0,0,0,.5);
+}
+.modal-box-lg { max-width:800px; }
+.modal-box-sm { max-width:420px; }
+.modal-title  { font-size:17px; font-weight:900; color:#fff; margin-bottom:4px; }
+.modal-subtitle { font-size:12px; color:var(--muted); margin-bottom:20px; }
+.modal-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
 
 /* ─── Line Clamp (fallback if Tailwind doesn't emit it) ──────────────────── */
 .line-clamp-1 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; }
