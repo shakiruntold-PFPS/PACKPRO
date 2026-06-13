@@ -6,6 +6,7 @@ import { ok, err, created, requireAuth, paginate, paginatedResponse, logAction }
 import { sanitizeObject } from "@/lib/sanitize";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { calculateLeadScore } from "@/lib/scoring";
 
 const LeadSchema = z.object({
   title:        z.string().min(1).max(300),
@@ -64,7 +65,20 @@ export async function GET(req: NextRequest) {
     db.lead.count({ where }),
   ]);
 
-  return ok(paginatedResponse(data, total, page, limit));
+  const scored = data.map((lead) => {
+    const { score, grade } = calculateLeadScore({
+      value:         lead.value ?? undefined,
+      priority:      lead.priority,
+      status:        lead.status,
+      activityCount: lead._count.activities,
+      createdAt:     lead.createdAt,
+      phone:         lead.phone,
+      email:         lead.email,
+    });
+    return { ...lead, score, grade };
+  });
+
+  return ok(paginatedResponse(scored, total, page, limit));
 }
 
 export async function POST(req: NextRequest) {

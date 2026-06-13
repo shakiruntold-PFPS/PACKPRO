@@ -46,10 +46,10 @@ export default function AdminCatalogPage() {
       const res = await fetch(`/api/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isFeatured: !current }),
+        body: JSON.stringify({ featured: !current }),
       });
       if (!res.ok) throw new Error("Failed");
-      setProducts(ps => ps.map(p => p.id === id ? { ...p, isFeatured: !current } : p));
+      setProducts(ps => ps.map(p => p.id === id ? { ...p, featured: !current } : p));
       success(!current ? "Marked as featured" : "Removed from featured");
     } catch {
       error("Failed to update");
@@ -73,7 +73,7 @@ export default function AdminCatalogPage() {
   }
 
   const catalogVisible = products.filter(p => p.isCatalogVisible && p.status === "PUBLISHED").length;
-  const featured = products.filter(p => p.isFeatured).length;
+  const featured = products.filter(p => p.featured).length;
 
   return (
     <div className="module-page">
@@ -159,9 +159,9 @@ export default function AdminCatalogPage() {
                   </button>
                 </td>
                 <td>
-                  <button onClick={() => toggleFeatured(p.id, p.isFeatured)}
-                    className="btn-ghost p-1.5" title={p.isFeatured ? "Remove from featured" : "Mark as featured"}>
-                    {p.isFeatured
+                  <button onClick={() => toggleFeatured(p.id, p.featured)}
+                    className="btn-ghost p-1.5" title={p.featured ? "Remove from featured" : "Mark as featured"}>
+                    {p.featured
                       ? <Star size={14} style={{ color: "#f59e0b" }} fill="#f59e0b" />
                       : <StarOff size={14} style={{ color: "var(--text-muted)" }} />}
                   </button>

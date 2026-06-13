@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const [products, categories] = await Promise.all([
     db.product.findMany({
       where,
-      orderBy: [{ isFeatured: "desc" }, { name: "asc" }],
+      orderBy: [{ featured: "desc" }, { name: "asc" }],
       include: {
         category: { select: { id: true, name: true } },
         images: { select: { url: true }, take: 1 },

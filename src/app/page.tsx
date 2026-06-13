@@ -5,7 +5,7 @@ async function getHomeData() {
   const [settings, products, categories] = await Promise.all([
     db.companySettings.findUnique({ where: { id: "default" } }).catch(() => null),
     db.product.findMany({
-      where: { isCatalogVisible: true, status: "PUBLISHED", isFeatured: true },
+      where: { isCatalogVisible: true, status: "PUBLISHED", featured: true },
       include: { category: { select: { name: true } }, images: { select: { url: true }, take: 1 } },
       take: 6,
       orderBy: { name: "asc" },
