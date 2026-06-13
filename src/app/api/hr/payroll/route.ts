@@ -110,7 +110,11 @@ export async function PATCH(req: NextRequest) {
 
   const payroll = await db.payroll.update({
     where: { id },
-    data: { status, paidOn: paidOn ? new Date(paidOn) : undefined },
+    data: {
+      status,
+      // paidAt is the correct schema field — paidOn was a naming error
+      paidAt: paidOn ? new Date(paidOn) : undefined,
+    },
   }).catch(() => null);
 
   if (!payroll) return err("Payroll record not found", 404);

@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
   const cnt    = await db.purchaseOrder.count();
   const number = `PO-${yr}${mo}-${String(cnt + 1).padStart(3, "0")}`;
 
-  const status: string = body.status ?? "DRAFT";
+  const status = (body.status ?? "DRAFT") as import("@prisma/client").PurchaseOrderStatus;
 
   // ── Create PO with nested items ────────────────────────────────────────────
   const po = await db.purchaseOrder.create({

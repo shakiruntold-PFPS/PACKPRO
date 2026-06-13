@@ -46,14 +46,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const newStatus = body.status ?? oldStatus;
 
   // Build update data using only fields that exist in the schema
-  const updateData: {
-    status?: string;
-    expectedDate?: Date;
-    subtotal?: number;
-    taxAmount?: number;
-    total?: number;
-    notes?: string;
-  } = {};
+  const updateData: import("@prisma/client").Prisma.PurchaseOrderUpdateInput = {};
 
   if (body.status !== undefined)       updateData.status       = body.status;
   if (body.expectedDate !== undefined) updateData.expectedDate = new Date(body.expectedDate);

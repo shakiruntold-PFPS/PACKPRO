@@ -3,24 +3,26 @@ export const runtime = "nodejs";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { ok, err, created, requireAuth, paginate, paginatedResponse, logAction } from "@/lib/api";
+import { sanitizeObject } from "@/lib/sanitize";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const LeadSchema = z.object({
-  title: z.string().min(1),
-  partyId: z.string().optional(),
-  contactName: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  company: z.string().optional(),
-  industry: z.string().optional(),
-  source: z.enum(["WEBSITE","WHATSAPP","REFERRAL","GOOGLE","INSTAGRAM","FACEBOOK","COLD_CALL","EXHIBITION","OTHER"]).default("WEBSITE"),
-  status: z.enum(["NEW","CONTACTED","QUALIFIED","PROPOSAL","NEGOTIATION","WON","LOST"]).default("NEW"),
-  priority: z.enum(["LOW","MEDIUM","HIGH","URGENT"]).default("MEDIUM"),
-  value: z.number().optional(),
-  notes: z.string().optional(),
+  title:        z.string().min(1).max(300),
+  partyId:      z.string().optional(),
+  contactName:  z.string().max(100).optional(),
+  phone:        z.string().max(20).optional(),
+  email:        z.string().email().max(254).optional().or(z.literal("")),
+  company:      z.string().max(200).optional(),
+  industry:     z.string().max(100).optional(),
+  source:       z.enum(["WEBSITE","WHATSAPP","REFERRAL","GOOGLE","INSTAGRAM","FACEBOOK","COLD_CALL","EXHIBITION","OTHER"]).default("WEBSITE"),
+  status:       z.enum(["NEW","CONTACTED","QUALIFIED","PROPOSAL","NEGOTIATION","WON","LOST"]).default("NEW"),
+  priority:     z.enum(["LOW","MEDIUM","HIGH","URGENT"]).default("MEDIUM"),
+  value:        z.number().min(0).max(1_000_000_000).optional(),
+  notes:        z.string().max(5000).optional(),
   assignedToId: z.string().optional(),
   followUpDate: z.string().optional(),
-  tags: z.array(z.string()).default([]),
+  tags:         z.array(z.string().max(50)).max(20).default([]),
 });
 
 export async function GET(req: NextRequest) {
@@ -28,22 +30,22 @@ export async function GET(req: NextRequest) {
   if (response) return response;
 
   const { searchParams } = new URL(req.url);
-  const page = Number(searchParams.get("page") ?? 1);
-  const limit = Number(searchParams.get("limit") ?? 25);
-  const search = searchParams.get("search") ?? "";
-  const status = searchParams.get("status") ?? "";
+  const page         = Number(searchParams.get("page")         ?? 1);
+  const limit        = Number(searchParams.get("limit")        ?? 25);
+  const search       = searchParams.get("search")       ?? "";
+  const status       = searchParams.get("status")       ?? "";
   const assignedToId = searchParams.get("assignedToId") ?? "";
 
-  const where: any = {};
+  const where: Prisma.LeadWhereInput = { deletedAt: null };
   if (search) {
     where.OR = [
-      { title: { contains: search, mode: "insensitive" } },
-      { company: { contains: search, mode: "insensitive" } },
+      { title:       { contains: search, mode: "insensitive" } },
+      { company:     { contains: search, mode: "insensitive" } },
       { contactName: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search } },
+      { phone:       { contains: search } },
     ];
   }
-  if (status) where.status = status;
+  if (status)       where.status       = status as Prisma.EnumLeadStatusFilter;
   if (assignedToId) where.assignedToId = assignedToId;
 
   const { skip, take } = paginate(page, limit);
@@ -54,8 +56,8 @@ export async function GET(req: NextRequest) {
       take,
       include: {
         assignedTo: { select: { id: true, name: true, avatar: true } },
-        party: { select: { id: true, name: true } },
-        _count: { select: { activities: true, tasks: true, quotes: true } },
+        party:      { select: { id: true, name: true } },
+        _count:     { select: { activities: true, tasks: true, quotes: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -73,23 +75,41 @@ export async function POST(req: NextRequest) {
   const parsed = LeadSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.message);
 
-  const data: any = { ...parsed.data };
-  if (!data.assignedToId) data.assignedToId = user!.id;
-  if (data.followUpDate) data.followUpDate = new Date(data.followUpDate);
+  const clean = sanitizeObject(parsed.data) as typeof parsed.data;
 
-  const lead = await db.lead.create({ data });
+  const leadData: Prisma.LeadCreateInput = {
+    title:        clean.title,
+    contactName:  clean.contactName,
+    phone:        clean.phone,
+    email:        clean.email || undefined,
+    company:      clean.company,
+    industry:     clean.industry,
+    source:       clean.source,
+    status:       clean.status,
+    priority:     clean.priority,
+    value:        clean.value,
+    notes:        clean.notes,
+    tags:         clean.tags,
+    followUpDate: clean.followUpDate ? new Date(clean.followUpDate) : undefined,
+    assignedTo:   { connect: { id: clean.assignedToId ?? user.id } },
+    ...(clean.partyId ? { party: { connect: { id: clean.partyId } } } : {}),
+  };
 
-  // Auto-create first activity
+  const lead = await db.lead.create({ data: leadData });
+
   await db.activity.create({
     data: {
-      type: "NOTE",
+      type:    "NOTE",
       subject: "Lead created",
-      notes: `Lead "${lead.title}" created`,
-      userId: user!.id,
-      leadId: lead.id,
+      notes:   `Lead "${lead.title}" created`,
+      userId:  user.id,
+      leadId:  lead.id,
     },
   });
 
-  await logAction(user!.id, "CREATE", "LEAD", lead.id, null, lead);
+  await logAction(user.id, "CREATE", "LEAD", lead.id, null, {
+    title: lead.title,
+    status: lead.status,
+  });
   return created(lead);
 }

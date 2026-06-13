@@ -1,6 +1,7 @@
 // src/lib/db.ts
 // Prisma singleton — handles both dev hot-reload and Vercel serverless/Neon
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
+export type { Prisma };
 
 declare global {
   // eslint-disable-next-line no-var
