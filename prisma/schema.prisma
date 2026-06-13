@@ -31,13 +31,14 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   // Relations
-  leads        Lead[]
-  quotes       Quote[]
-  salesOrders  SalesOrder[]
-  activities   Activity[]
-  tasks        Task[]
-  auditLogs    AuditLog[]
-  employees    Employee[]
+  leads         Lead[]
+  quotes        Quote[]
+  salesOrders   SalesOrder[]
+  activities    Activity[]
+  tasks         Task[]
+  auditLogs     AuditLog[]
+  employees     Employee[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -928,6 +929,24 @@ model AuditLog {
   @@index([module, createdAt])
   @@index([recordId])
   @@map("audit_logs")
+}
+
+// ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 // ─── SCHEMA VERSION ────────────────────────────────────────────────────────────

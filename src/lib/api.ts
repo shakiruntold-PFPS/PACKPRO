@@ -164,3 +164,18 @@ export function paginatedResponse<T>(
     },
   };
 }
+
+// ─── Notification Helper ───────────────────────────────────────────────────────
+export async function notify(
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  link?: string
+) {
+  try {
+    await db.notification.create({ data: { userId, type, title, message, link } });
+  } catch {
+    // Non-fatal
+  }
+}
