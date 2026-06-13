@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 // src/app/api/hr/payroll/route.ts
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";

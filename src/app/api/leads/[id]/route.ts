@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { ok, err, requireAuth, logAction } from "@/lib/api";
