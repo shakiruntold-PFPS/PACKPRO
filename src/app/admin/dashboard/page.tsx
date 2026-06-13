@@ -3,36 +3,43 @@ import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
   TrendingUp, TrendingDown, Users, Package, FileText,
-  Receipt, AlertTriangle, DollarSign, ShoppingCart, RefreshCw
+  Receipt, AlertTriangle, ShoppingCart, RefreshCw,
+  Truck, DollarSign, Activity,
 } from "lucide-react";
-import { formatDate } from "@/lib/utils";
 
-const AreaChart    = dynamic(() => import("recharts").then(m => m.AreaChart),    { ssr: false });
-const Area         = dynamic(() => import("recharts").then(m => m.Area),         { ssr: false });
-const BarChart     = dynamic(() => import("recharts").then(m => m.BarChart),     { ssr: false });
-const Bar          = dynamic(() => import("recharts").then(m => m.Bar),          { ssr: false });
-const XAxis        = dynamic(() => import("recharts").then(m => m.XAxis),        { ssr: false });
-const YAxis        = dynamic(() => import("recharts").then(m => m.YAxis),        { ssr: false });
+const AreaChart = dynamic(() => import("recharts").then(m => m.AreaChart), { ssr: false });
+const Area = dynamic(() => import("recharts").then(m => m.Area), { ssr: false });
+const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
 const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
-const Tooltip      = dynamic(() => import("recharts").then(m => m.Tooltip),      { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 
-function KPI({ label, value, sub, icon: Icon, color = "#0ea5a0", trend }: any) {
+function fmt(n: number) {
+  if (n >= 1e7) return `₹${(n / 1e7).toFixed(1)}Cr`;
+  if (n >= 1e5) return `₹${(n / 1e5).toFixed(1)}L`;
+  if (n >= 1e3) return `₹${(n / 1e3).toFixed(0)}K`;
+  return `₹${n}`;
+}
+
+function KpiCard({ label, value, sub, icon: Icon, color = "#0ea5a0", trend }: any) {
   return (
     <div className="kpi-card">
       <div className="flex items-start justify-between mb-3">
-        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color:"var(--muted)" }}>{label}</div>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background:`${color}20` }}>
-          <Icon size={15} style={{ color }}/>
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{label}</p>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: `${color}18` }}>
+          <Icon size={16} style={{ color }} />
         </div>
       </div>
-      <div className="text-2xl font-black text-white mb-1">{value}</div>
-      {sub && <div className="text-xs" style={{ color:"var(--muted)" }}>{sub}</div>}
+      <p className="text-2xl font-black mb-1" style={{ color: "var(--text-primary)" }}>{value}</p>
+      {sub && <p className="text-xs" style={{ color: "var(--text-muted)" }}>{sub}</p>}
       {trend !== undefined && (
-        <div className="text-xs font-semibold mt-1 flex items-center gap-1"
-          style={{ color:trend>=0?"#10b981":"#ef4444" }}>
-          {trend>=0 ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
+        <div className="flex items-center gap-1 text-xs font-semibold mt-1.5"
+          style={{ color: trend >= 0 ? "#10b981" : "#ef4444" }}>
+          {trend >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
           {Math.abs(trend)}% vs last month
         </div>
       )}
@@ -40,17 +47,17 @@ function KPI({ label, value, sub, icon: Icon, color = "#0ea5a0", trend }: any) {
   );
 }
 
-const CHART_COLORS = ["#0ea5a0","#1b4f8a","#f59e0b","#10b981","#ef4444"];
+const COLORS = ["#0ea5a0", "#1b4f8a", "#f59e0b", "#10b981", "#a78bfa"];
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [fetchError, setFetchError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  const fetchDashboard = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setFetchError("");
     try {
       const res = await fetch("/api/dashboard");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -58,160 +65,230 @@ export default function DashboardPage() {
       setData(json.data);
       setLastUpdated(new Date());
     } catch (e: any) {
-      setError(e.message ?? "Failed to load dashboard data");
+      setFetchError(e.message ?? "Failed to load");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => { load(); }, [load]);
 
-  const kpi = data?.kpi ?? {};
-  const recentActivity = data?.recentActivity ?? [];
+  const kpis = data?.kpis ?? {};
+  const monthlyTrend = data?.monthlyTrend ?? [];
   const topProducts = data?.topProducts ?? [];
-  const revenueTrend = data?.revenueTrend ?? [];
+  const recentActivities = data?.recentActivities ?? [];
+  const quoteFunnel = data?.quoteFunnel ?? [];
+
+  const now = new Date();
+  const timeStr = now.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" });
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div>
           <h1 className="module-title">Executive Dashboard</h1>
-          <p className="module-subtitle">PACKPRO Food Packaging Solutions · FY 2025–26</p>
+          <p className="module-subtitle">Real-time business intelligence · {timeStr}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs" style={{ color:"var(--muted)" }}>
-            Updated {formatDate(lastUpdated.toISOString())}
-          </div>
-          <button className="btn-ghost" onClick={fetchDashboard}>
-            <RefreshCw size={13} className={loading?"animate-spin":""}/>
-            Refresh
-          </button>
-        </div>
+        <button className="btn-ghost" onClick={load}>
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
       </div>
 
-      {error && (
-        <div className="mb-6">
-          <div className="rounded-2xl p-6"
-            style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)" }}>
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background:"rgba(239,68,68,0.2)" }}>
-                <AlertTriangle size={20} style={{ color:"#ef4444" }} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-white mb-1">Database not connected — Setup required</h3>
-                <p className="text-sm mb-4" style={{ color:"#ef4444" }}>{error}</p>
-                <div className="rounded-xl p-4 text-sm space-y-2"
-                  style={{ background:"rgba(0,0,0,0.3)", border:"1px solid rgba(255,255,255,0.06)" }}>
-                  <p className="font-semibold text-white mb-3">To fix this, set these environment variables in Vercel:</p>
-                  <div className="space-y-1 font-mono text-xs" style={{ color:"#14c7c0" }}>
-                    <div>DATABASE_URL=<span style={{ color:"#8ba5c8" }}>postgresql://user:pass@host/db</span></div>
-                    <div>NEXTAUTH_SECRET=<span style={{ color:"#8ba5c8" }}>your-secret-key</span></div>
-                    <div>NEXTAUTH_URL=<span style={{ color:"#8ba5c8" }}>https://your-app.vercel.app</span></div>
-                  </div>
-                  <p className="text-xs mt-3" style={{ color:"#8ba5c8" }}>
-                    Go to Vercel Dashboard → Your Project → Settings → Environment Variables, then redeploy.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+      {fetchError && (
+        <div className="mb-6 rounded-2xl p-4 flex items-center gap-3"
+          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+          <AlertTriangle size={18} style={{ color: "#ef4444", flexShrink: 0 }} />
+          <div className="text-sm" style={{ color: "#ef4444" }}>{fetchError}</div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPI label="Monthly Revenue" value={`₹${((kpi.monthlyRevenue??0)/100000).toFixed(1)}L`} sub="Current month invoices" icon={TrendingUp} color="#0ea5a0"/>
-        <KPI label="Active Leads" value={kpi.activeLeads??0} sub="In pipeline" icon={Users} color="#f59e0b"/>
-        <KPI label="Open Quotes" value={kpi.openQuotes??0} sub="Pending approval" icon={FileText} color="#1b4f8a"/>
-        <KPI label="Outstanding" value={`₹${((kpi.outstanding??0)/100000).toFixed(1)}L`} sub="Receivables pending" icon={Receipt} color="#ef4444"/>
+      {/* KPI Row 1 — Revenue */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <KpiCard label="Today's Revenue" value={fmt(kpis.todayRevenue ?? 0)} sub="Invoiced today" icon={DollarSign} color="#0ea5a0" />
+        <KpiCard label="Month Revenue" value={fmt(kpis.monthRevenue ?? 0)} sub="Current month" icon={TrendingUp} color="#1b4f8a" />
+        <KpiCard label="Year Revenue" value={fmt(kpis.yearRevenue ?? 0)} sub="FY Apr–Mar" icon={Activity} color="#a78bfa" />
+        <KpiCard label="Receivables" value={fmt(kpis.outstandingReceivables ?? 0)} sub="Pending collection" icon={Receipt} color="#ef4444" />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPI label="Pending Orders" value={kpi.pendingOrders??0} sub="Ready to dispatch" icon={ShoppingCart} color="#a78bfa"/>
-        <KPI label="Low Stock Alerts" value={kpi.lowStock??0} sub="Below reorder level" icon={AlertTriangle} color="#f59e0b"/>
-        <KPI label="Active Employees" value={kpi.activeEmployees??0} sub="On payroll" icon={Users} color="#10b981"/>
-        <KPI label="Total Products" value={kpi.totalProducts??0} sub="In catalog" icon={Package} color="#0ea5a0"/>
+      {/* KPI Row 2 — Operations */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard label="Active Leads" value={kpis.totalLeads ?? 0} sub={`${kpis.hotLeads ?? 0} urgent`} icon={Users} color="#f59e0b" />
+        <KpiCard label="Open Quotes" value={kpis.openQuotes ?? 0} sub="Awaiting response" icon={FileText} color="#0ea5a0" />
+        <KpiCard label="Pending Orders" value={kpis.pendingOrders ?? 0} sub="Ready/Processing" icon={ShoppingCart} color="#10b981" />
+        <KpiCard label="Dispatches" value={kpis.pendingDispatches ?? 0} sub="In transit" icon={Truck} color="#1b4f8a" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* Revenue Trend */}
         <div className="lg:col-span-2 glass rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="font-bold text-white text-sm">Revenue Trend</div>
-            <span className="badge badge-teal">Last 6 months</span>
+            <p className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>Revenue Trend</p>
+            <span className="badge badge-teal text-[10px]">Last 6 months</span>
           </div>
-          {revenueTrend.length > 0 ? (
+          {monthlyTrend.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={revenueTrend}>
+              <AreaChart data={monthlyTrend} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5a0" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#0ea5a0" stopOpacity={0}/>
+                  <linearGradient id="grad-rev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0ea5a0" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#0ea5a0" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
-                <XAxis dataKey="month" tick={{ fill:"#8ba5c8", fontSize:11 }} axisLine={false} tickLine={false}/>
-                <YAxis tick={{ fill:"#8ba5c8", fontSize:11 }} axisLine={false} tickLine={false}
-                  tickFormatter={(v:number) => `₹${(v/100000).toFixed(1)}L`}/>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="month" tick={{ fill: "#8ba5c8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#8ba5c8", fontSize: 11 }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: number) => fmt(v)} width={55} />
                 <Tooltip
-                  contentStyle={{ background:"#142645", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, fontSize:12 }}
-                  formatter={(v:any) => [`₹${(v/1000).toFixed(0)}K`, "Revenue"]}
+                  contentStyle={{ background: "#0f2444", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, fontSize: 12 }}
+                  formatter={(v: any) => [fmt(v), "Revenue"]}
                 />
-                <Area type="monotone" dataKey="revenue" stroke="#0ea5a0" strokeWidth={2} fill="url(#rev)"/>
+                <Area type="monotone" dataKey="revenue" stroke="#0ea5a0" strokeWidth={2.5} fill="url(#grad-rev)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-48 text-sm" style={{ color:"var(--muted)" }}>
+            <div className="h-48 flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
               {loading ? "Loading chart…" : "No revenue data yet — create invoices to see trends"}
             </div>
           )}
         </div>
 
+        {/* Quote Funnel */}
         <div className="glass rounded-2xl p-5">
-          <div className="font-bold text-white text-sm mb-4">Top Products</div>
-          {topProducts.length > 0 ? topProducts.map((p:any, i:number) => (
-            <div key={p.name} className="mb-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span style={{ color:"var(--muted)" }}>{p.name}</span>
-                <span className="font-semibold" style={{ color:"#14c7c0" }}>{p.pct}%</span>
-              </div>
-              <div className="h-1.5 rounded-full" style={{ background:"var(--border)" }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width:`${p.pct}%`, background:`linear-gradient(90deg, ${CHART_COLORS[i%5]}, ${CHART_COLORS[i%5]}88)` }}/>
-              </div>
-            </div>
-          )) : (
-            <div className="flex items-center justify-center h-32 text-sm" style={{ color:"var(--muted)" }}>
-              {loading ? "Loading…" : "No product data yet"}
+          <p className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>Quote Funnel</p>
+          {quoteFunnel.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={quoteFunnel} margin={{ top: 0, right: 5, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="status" tick={{ fill: "#8ba5c8", fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#8ba5c8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: "#0f2444", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, fontSize: 12 }}
+                />
+                <Bar dataKey="_count" name="Quotes" fill="#1b4f8a" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-48 flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
+              {loading ? "Loading…" : "No quotes yet"}
             </div>
           )}
         </div>
       </div>
 
-      <div className="glass rounded-2xl p-5">
-        <div className="font-bold text-white text-sm mb-4">Recent Activity</div>
-        {recentActivity.length > 0 ? (
+      {/* Bottom Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Alerts */}
+        <div className="glass rounded-2xl p-5">
+          <p className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>Alerts</p>
           <div className="space-y-3">
-            {recentActivity.map((a:any) => (
-              <div key={a.id} className="flex gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background:"linear-gradient(135deg,#0ea5a0,#1b4f8a)", color:"#fff" }}>
-                  {(a.user?.[0] ?? "?")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white leading-tight">
-                    <span className="font-semibold">{a.user}</span>{" "}
-                    <span style={{ color:"var(--muted)" }}>{a.action}</span>
-                  </div>
-                  <div className="text-[11px] mt-0.5" style={{ color:"var(--muted)" }}>{a.time}</div>
-                </div>
+            {(kpis.lowStockCount ?? 0) > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                <AlertTriangle size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
+                <span className="text-xs" style={{ color: "#f59e0b" }}>
+                  {kpis.lowStockCount} products below reorder level
+                </span>
               </div>
-            ))}
+            )}
+            {(kpis.outstandingReceivables ?? 0) > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <Receipt size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+                <span className="text-xs" style={{ color: "#ef4444" }}>
+                  {fmt(kpis.outstandingReceivables)} in outstanding receivables
+                </span>
+              </div>
+            )}
+            {(kpis.hotLeads ?? 0) > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: "rgba(14,165,160,0.08)", border: "1px solid rgba(14,165,160,0.2)" }}>
+                <Users size={14} style={{ color: "#0ea5a0", flexShrink: 0 }} />
+                <span className="text-xs" style={{ color: "#0ea5a0" }}>
+                  {kpis.hotLeads} urgent leads need follow-up
+                </span>
+              </div>
+            )}
+            {!kpis.lowStockCount && !kpis.outstandingReceivables && !kpis.hotLeads && (
+              <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>All clear — no alerts</p>
+            )}
+            <div className="pt-2 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: "var(--text-muted)" }}>Employees</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{kpis.totalEmployees ?? 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: "var(--text-muted)" }}>Products</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{kpis.totalProducts ?? 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: "var(--text-muted)" }}>Payables</span>
+                <span className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(kpis.outstandingPayables ?? 0)}</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-6 text-sm" style={{ color:"var(--muted)" }}>
-            {loading ? "Loading…" : "No recent activity recorded yet"}
-          </div>
-        )}
+        </div>
+
+        {/* Top Products */}
+        <div className="glass rounded-2xl p-5">
+          <p className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>Top Products</p>
+          {topProducts.length > 0 ? (
+            <div className="space-y-3">
+              {topProducts.map((p: any, i: number) => {
+                const maxVal = topProducts[0]?._sum?.total ?? 1;
+                const pct = Math.round(((p._sum?.total ?? 0) / maxVal) * 100);
+                return (
+                  <div key={p.productId ?? i}>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="truncate" style={{ color: "var(--text-muted)" }}>Product #{i + 1}</span>
+                      <span className="font-semibold ml-2 flex-shrink-0" style={{ color: COLORS[i % 5] }}>
+                        {fmt(p._sum?.total ?? 0)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full" style={{ background: "var(--border)" }}>
+                      <div className="h-full rounded-full"
+                        style={{ width: `${pct}%`, background: COLORS[i % 5] }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
+              {loading ? "Loading…" : "No product sales data yet"}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Activity */}
+        <div className="glass rounded-2xl p-5">
+          <p className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>Recent Activity</p>
+          {recentActivities.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivities.slice(0, 6).map((a: any) => (
+                <div key={a.id} className="flex gap-3">
+                  <div className="avatar avatar-sm flex-shrink-0">
+                    {a.user?.name?.[0] ?? "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs leading-snug" style={{ color: "var(--text-primary)" }}>
+                      <span className="font-semibold">{a.user?.name ?? "System"}</span>{" "}
+                      <span style={{ color: "var(--text-muted)" }}>{a.action}</span>
+                    </p>
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
+              {loading ? "Loading…" : "No activity recorded yet"}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
