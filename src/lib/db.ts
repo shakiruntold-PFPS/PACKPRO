@@ -11,10 +11,12 @@ declare global {
 function createPrismaClient() {
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    // Neon + Vercel serverless: keep connection limit low
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        // Neon: use pooled URL for queries; direct URL for migrations (set separately via CLI).
+        // The "build:" fallback is never used at runtime — it just satisfies Prisma's
+        // constructor validation when DATABASE_URL is absent in the Next.js build step.
+        url: process.env.DATABASE_URL ?? "postgresql://build:build@localhost:5432/build",
       },
     },
   });
