@@ -99,3 +99,20 @@ export async function POST(req: NextRequest) {
 
   return created(payroll);
 }
+
+export async function PATCH(req: NextRequest) {
+  const { response } = await requireAuth(req);
+  if (response) return response;
+
+  const body = await req.json().catch(() => ({}));
+  const { id, status, paidOn } = body;
+  if (!id || !status) return err("id and status required");
+
+  const payroll = await db.payroll.update({
+    where: { id },
+    data: { status, paidOn: paidOn ? new Date(paidOn) : undefined },
+  }).catch(() => null);
+
+  if (!payroll) return err("Payroll record not found", 404);
+  return ok(payroll);
+}

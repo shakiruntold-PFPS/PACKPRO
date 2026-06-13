@@ -130,16 +130,33 @@ export async function GET(req: NextRequest) {
     ? lowStockProducts.filter((p: any) => (p.stockQty ?? 0) <= (p.reorderLevel ?? 100)).length
     : 0;
 
-  // Monthly trend uses mock data until real DB is connected
-  // In production this would be a $queryRaw aggregation
-  const monthlyTrend = [
-    { month: "Jan", revenue: 820000, invoices: 14 },
-    { month: "Feb", revenue: 940000, invoices: 18 },
-    { month: "Mar", revenue: 780000, invoices: 12 },
-    { month: "Apr", revenue: 1120000, invoices: 22 },
-    { month: "May", revenue: 1350000, invoices: 28 },
-    { month: "Jun", revenue: 1240000, invoices: 24 },
-  ];
+  // Build real monthly revenue trend for last 6 months
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return { year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleString("en-IN", { month: "short" }) };
+  });
+
+  const monthlyTrendRaw = await Promise.all(
+    months.map(m =>
+      db.invoice.aggregate({
+        where: {
+          date: {
+            gte: new Date(m.year, m.month, 1),
+            lt:  new Date(m.year, m.month + 1, 1),
+          },
+          status: { not: "CANCELLED" },
+        },
+        _sum: { total: true },
+        _count: true,
+      }).catch(() => ({ _sum: { total: 0 }, _count: 0 }))
+    )
+  );
+
+  const monthlyTrend = months.map((m, i) => ({
+    month: m.label,
+    revenue: (monthlyTrendRaw[i] as any)._sum?.total ?? 0,
+    invoices: (monthlyTrendRaw[i] as any)._count ?? 0,
+  }));
 
   return ok({
     kpis: {
