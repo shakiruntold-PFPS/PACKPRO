@@ -108,7 +108,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             const Icon = item.icon;
             return (
               <button key={item.href} onClick={() => go(item.href)}
-                className={`cmd-item ${i === idx ? "active" : ""}`}
+                className={`cmd-item ${i === idx ? "focused" : ""}`}
                 onMouseEnter={() => setIdx(i)}>
                 <Icon size={15} style={{ color: i === idx ? "var(--brand)" : "var(--text-muted)" }} />
                 <span>{item.label}</span>

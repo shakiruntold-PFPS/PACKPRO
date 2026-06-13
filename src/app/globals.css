@@ -285,6 +285,11 @@ img { max-width: 100%; display: block; }
   border-radius: var(--radius-lg); overflow: hidden;
 }
 
+.glass {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
 /* ─── Badges ─────────────────────────────────────────────────── */
 .badge {
   display: inline-flex; align-items: center; gap: 5px;
