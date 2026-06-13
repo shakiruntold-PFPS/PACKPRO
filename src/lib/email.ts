@@ -291,3 +291,26 @@ export async function sendLowStockAlert(params: {
     html: wrapHtml("Low Stock Alert", body),
   });
 }
+
+export async function sendPasswordResetEmail(
+  to: string,
+  name: string,
+  resetUrl: string
+) {
+  const body = `
+    <p style="font-size:15px;color:#1a1a2e;margin-bottom:16px;">Hi ${name},</p>
+    <p style="font-size:14px;color:#555;margin-bottom:20px;">
+      You requested a password reset for your PACKPRO account. Click the button below to set a new password.
+      This link expires in <strong>1 hour</strong>.
+    </p>
+    ${primaryButton("Reset Password", resetUrl)}
+    <p style="font-size:12px;color:#888;margin-top:20px;">
+      If you did not request a password reset, you can safely ignore this email.
+    </p>`;
+
+  return send({
+    to,
+    subject: "Reset your PACKPRO password",
+    html: wrapHtml("Password Reset", body),
+  });
+}

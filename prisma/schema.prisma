@@ -31,14 +31,15 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   // Relations
-  leads         Lead[]
-  quotes        Quote[]
-  salesOrders   SalesOrder[]
-  activities    Activity[]
-  tasks         Task[]
-  auditLogs     AuditLog[]
-  employees     Employee[]
-  notifications Notification[]
+  leads              Lead[]
+  quotes             Quote[]
+  salesOrders        SalesOrder[]
+  activities         Activity[]
+  tasks              Task[]
+  auditLogs          AuditLog[]
+  employees          Employee[]
+  notifications      Notification[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -929,6 +930,21 @@ model AuditLog {
   @@index([module, createdAt])
   @@index([recordId])
   @@map("audit_logs")
+}
+
+// ─── PASSWORD RESET ────────────────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@map("password_reset_tokens")
 }
 
 // ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
