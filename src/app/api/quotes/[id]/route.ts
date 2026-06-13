@@ -81,3 +81,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   await logAction(user!.id, "CONVERT", "QUOTE", id, null, { soNumber });
   return ok(order);
 }
+
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const { user, response } = await requireAuth(req);
+  if (response) return response;
+  const { id } = await params;
+  const quote = await db.quote.findUnique({ where: { id }, select: { number: true } });
+  if (!quote) return err("Quote not found", 404);
+  await db.quoteItem.deleteMany({ where: { quoteId: id } });
+  await db.quote.delete({ where: { id } });
+  await logAction(user!.id, "DELETE", "QUOTE", id, null, { number: quote.number });
+  return ok({ deleted: true });
+}
